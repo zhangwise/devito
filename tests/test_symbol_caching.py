@@ -7,7 +7,6 @@ from devito import DenseData, TimeData, clear_cache
 from devito.interfaces import _SymbolCache
 
 
-@pytest.mark.xfail(reason="New function instances currently don't cache")
 @pytest.mark.parametrize('FunctionType', [DenseData, TimeData])
 def test_cache_function_new(FunctionType):
     """Test caching of a new u[x, y] instance"""

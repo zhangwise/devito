@@ -3,6 +3,7 @@ import weakref
 import numpy as np
 from sympy import Function, IndexedBase, as_finite_diff, symbols
 from sympy.abc import h, s
+from sympy.core import cacheit
 
 from devito.dimension import p, t, x, y, z
 from devito.finite_difference import (centered, cross_derivative,
@@ -73,6 +74,7 @@ class SymbolicData(Function, CachedSymbol):
     to (re-)create the dimension arguments of the symbolic function.
     """
 
+    @cacheit
     def __new__(cls, *args, **kwargs):
         if cls._cached():
             newobj = Function.__new__(cls, *args)
