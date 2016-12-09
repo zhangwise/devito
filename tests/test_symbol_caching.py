@@ -52,9 +52,7 @@ def test_symbol_cache_aliasing():
 
     # Ensure a clean cache to start with
     clear_cache()
-    # FIXME: Currently not working, presumably due to our
-    # failure to cache new instances?
-    # assert(len(_SymbolCache) == 0)
+    assert(len(_SymbolCache) == 0)
 
     # Create first instance of u and fill its data
     u = DenseData(name='u', shape=(3, 4))
@@ -65,8 +63,7 @@ def test_symbol_cache_aliasing():
     dx = u.dx  # Contains two u symbols: u[x, y] and u[x + h, y]
     del dx
     clear_cache()
-    # FIXME: Unreliable cache sizes
-    # assert len(_SymbolCache) == 1  # We still have a reference to u
+    assert len(_SymbolCache) == 1  # We still have a reference to u
     assert np.allclose(u.data, 6.)  # u.data is alive and well
 
     # Remove the final instance and ensure u.data got deallocated
@@ -82,9 +79,7 @@ def test_symbol_cache_aliasing_reverse():
 
     # Ensure a clean cache to start with
     clear_cache()
-    # FIXME: Currently not working, presumably due to our
-    # failure to cache new instances?
-    # assert(len(_SymbolCache) == 0)
+    assert(len(_SymbolCache) == 0)
 
     # Create first instance of u and fill its data
     u = DenseData(name='u', shape=(3, 4))
@@ -96,27 +91,25 @@ def test_symbol_cache_aliasing_reverse():
     del u
     clear_cache()
     # We still have a references to u
-    # FIXME: Unreliable cache sizes
-    # assert len(_SymbolCache) == 1
+    assert len(_SymbolCache) == 1
     # Ensure u[x + h, y] still holds valid data
     assert np.allclose(dx.args[0].args[1].data, 6.)
 
     del dx
     clear_cache()
-    # FIXME: Unreliable cache sizes
-    # assert len(_SymbolCache) == 0  # We still have a reference to u_h
+    assert len(_SymbolCache) == 0  # We still have a reference to u_h
     assert u_ref() is None
 
 
 def test_clear_cache(nx=1000, ny=1000):
+    """Test to assert that clear_cache indeed empties our cache"""
     clear_cache()
-    cache_size = len(_SymbolCache)
 
     for i in range(10):
-        assert(len(_SymbolCache) == cache_size)
+        assert len(_SymbolCache) == 0
 
         DenseData(name='u', shape=(nx, ny), dtype=np.float64, space_order=2)
 
-        assert(len(_SymbolCache) == cache_size + 1)
+        assert len(_SymbolCache) == 1
 
         clear_cache()
