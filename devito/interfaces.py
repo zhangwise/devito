@@ -74,7 +74,7 @@ class SymbolicData(Function, CachedSymbol):
     """
 
     def __new__(cls, *args, **kwargs):
-        if cls in _SymbolCache:
+        if cls._cached():
             newobj = Function.__new__(cls, *args)
             newobj._cached_init()
         else:
