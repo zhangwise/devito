@@ -52,7 +52,8 @@ class TTI_cg:
         damp_boundary(self.damp.data, nbpml)
 
     def Forward(self, save=False, dse='advanced', dle='advanced', auto_tuning=False,
-                cache_blocking=None, compiler=None, u_ini=None, legacy=True):
+                cache_blocking=None, compiler=None, u_ini=None, legacy=True,
+                custom_kernel=None):
         nt, nrec = self.data.shape
         nsrc = self.source.shape[1]
         ndim = len(self.damp.shape)
@@ -141,5 +142,5 @@ class TTI_cg:
             return (rec.data, u.data, v.data,
                     fw.propagator.gflopss, fw.propagator.oi, fw.propagator.timings)
         else:
-            summary = fw.apply(autotune=auto_tuning)
+            summary = fw.apply(autotune=auto_tuning, custom_kernel=custom_kernel)
             return rec.data, u.data, v.data, summary.gflopss, summary.oi, summary.timings

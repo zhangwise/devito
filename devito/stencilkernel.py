@@ -11,7 +11,7 @@ import cgen as c
 import numpy as np
 
 from devito.compiler import (get_compiler_from_env, get_tmp_dir,
-                             jit_compile_and_load)
+                             jit_compile_and_load, load)
 from devito.dimension import BufferedDimension, Dimension
 from devito.dle import transform
 from devito.dse import (as_symbol, estimate_cost, estimate_memory, indexify,
@@ -203,6 +203,13 @@ class StencilKernel(Function):
             arguments[self.profiler.s_name] = cpointer
 
         # Invoke kernel function with args
+        custom_kernel = kwargs.get('custom_kernel', None)
+        if custom_kernel:
+            # Inject a custom user-defined kernel lib
+            info("Using custom kernel: %s" % custom_kernel)
+            self._lib = load(custom_kernel.split('.so')[0],
+                             compiler=self.compiler)
+
         self.cfunction(*list(arguments.values()))
 
         # Output summary of performance achieved

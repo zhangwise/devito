@@ -67,7 +67,7 @@ def setup(dimensions=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=250.0,
 
 def run(dimensions=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=250.0,
         time_order=2, space_order=4, nbpml=10, dse='advanced', dle='advanced',
-        auto_tuning=False, compiler=None, cache_blocking=None, legacy=True):
+        auto_tuning=False, compiler=None, cache_blocking=None, legacy=True, custom_kernel=None):
     if auto_tuning:
         cache_blocking = None
 
@@ -76,7 +76,8 @@ def run(dimensions=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=250.0,
     rec, u, v, gflopss, oi, timings = TTI.Forward(dse=dse, dle=dle,
                                                   auto_tuning=auto_tuning,
                                                   cache_blocking=cache_blocking,
-                                                  compiler=compiler, legacy=legacy)
+                                                  compiler=compiler, legacy=legacy,
+                                                  custom_kernel=custom_kernel)
 
     return gflopss, oi, timings, [rec, u, v]
 

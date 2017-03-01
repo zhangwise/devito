@@ -81,6 +81,8 @@ if __name__ == "__main__":
     devito.add_argument("-cb", "--cache_blocking", nargs=2, type=int,
                         default=None, metavar=("blockDim1", "blockDim2"),
                         help="User provided block sizes when auto-tuning is off")
+    devito.add_argument("--custom-kernel", default=None,
+                        help="Backdoor to insert custom kernel libs")
 
     benchmarking = parser.add_argument_group("Benchmarking")
     benchmarking.add_argument("-r", "--resultsdir", default="results",
