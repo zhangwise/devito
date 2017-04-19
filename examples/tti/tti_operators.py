@@ -158,8 +158,7 @@ def ForwardOperator(model, u, v, src, rec, data, time_order=2,
         time_subs = {t + 2: t + 1, t: t + 2, t - 2: t, t - 1: t + 1, t + 1: t}
         subs.update(time_subs)
 
-        op = StencilKernel(stencils=stencils, subs=subs, dse=dse, dle=dle,
-                           compiler=compiler)
+        op = StencilKernel(stencils=stencils, subs=subs, dse=dse, dle=dle)
 
     return op
 
@@ -273,7 +272,6 @@ def ForwardOperatorDB(model, u, v, src, rec, data, time_order=2,
         time_subs = {t + 2: t + 1, t: t + 2, t - 2: t, t - 1: t + 1, t + 1: t}
         subs.update(time_subs)
 
-        op = StencilKernel(stencils=stencils, subs=subs, dse=dse, dle=dle,
-                           compiler=compiler)
+        op = StencilKernel(stencils=stencils, subs=subs, dse=dse, dle=dle)
 
     return op
