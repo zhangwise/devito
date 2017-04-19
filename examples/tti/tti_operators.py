@@ -208,12 +208,12 @@ def ForwardOperatorDB(model, u, v, src, rec, data, time_order=2,
                 coeff2 = R_mat[2][k]*R_mat[2][l]
                 for j in range(3):
                     H1 += coeff1 * (first_derivative(first_derivative((R_mat[0][k] * R_mat[0][j] + R_mat[1][k] * R_mat[1][j])*u +
-                                                                      (R_mat[2][k]*R_mat[2][l])*v,
+                                                                      (R_mat[2][k]*R_mat[2][j])*v,
                                                                       dim=dims[l], side=centered, order=spc_brd),
                                                      dim=dims[j], side=centered, order=spc_brd))
 
                     H2 += coeff2 * (first_derivative(first_derivative((R_mat[0][k] * R_mat[0][j] + R_mat[1][k] * R_mat[1][j])*u +
-                                                                      (R_mat[2][k]*R_mat[2][l])*v,
+                                                                      (R_mat[2][k]*R_mat[2][j])*v,
                                                                       dim=dims[l], side=centered, order=spc_brd),
                                                      dim=dims[j], side=centered, order=spc_brd))
 
