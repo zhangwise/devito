@@ -78,28 +78,28 @@ class Model(object):
             if np.max(self.epsilon.data) > 0:
                 self.scale = np.sqrt(np.max(self.epsilon.data))
         else:
-            self.epsilon = 1.
+            self.epsilon = 1
 
         if delta is not None:
             self.delta = DenseData(name="delta", shape=self.shape_domain,
                                    dtype=self.dtype)
             self.delta.data[:] = self.pad(np.sqrt(1 + 2 * delta))
         else:
-            self.delta = None
+            self.delta = 1
 
         if theta is not None:
             self.theta = DenseData(name="theta", shape=self.shape_domain,
                                    dtype=self.dtype)
             self.theta.data[:] = self.pad(theta)
         else:
-            self.theta = None
+            self.theta = 0
 
         if phi is not None:
             self.phi = DenseData(name="phi", shape=self.shape_domain,
                                  dtype=self.dtype)
             self.phi.data[:] = self.pad(phi)
         else:
-            self.phi = None
+            self.phi = 0
 
     @property
     def shape(self):

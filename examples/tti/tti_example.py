@@ -73,11 +73,10 @@ def run(dimensions=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=250.0,
 
     TTI = setup(dimensions, spacing, tn, time_order, space_order, nbpml)
 
-    rec, u, v, gflopss, oi, timings = TTI.Forward(dse=dse, dle=dle,
-                                                  auto_tuning=auto_tuning,
-                                                  cache_blocking=cache_blocking,
-                                                  compiler=compiler, legacy=legacy)
-
+    rec, u, v, gflopss, oi, timings = TTI.ForwardDB(dse=dse, dle=dle,
+                                                    auto_tuning=auto_tuning,
+                                                    cache_blocking=cache_blocking,
+                                                    compiler=compiler, legacy=legacy)
     return gflopss, oi, timings, [rec, u, v]
 
 
