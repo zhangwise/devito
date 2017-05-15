@@ -27,8 +27,9 @@ def source(t, f0):
 
 def run(dimensions=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=1000.0,
         time_order=2, space_order=4, nbpml=40, dse='advanced', dle='advanced',
-        auto_tuning=False, compiler=None, cache_blocking=None, full_run=False):
+        auto_tuning=False, compiler=None, cache_blocking=None, full_run=False, custom=False):
 
+    dle = 'basic'
     origin = (0., 0., 0.)
 
     # True velocity
@@ -83,8 +84,8 @@ def run(dimensions=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=1000.0,
 
     info("Applying Forward")
     rec, u, gflopss, oi, timings = Acoustic.Forward(
-        cache_blocking=cache_blocking, save=full_run, dse=dse, dle=dle,
-        auto_tuning=auto_tuning, compiler=compiler
+        cache_blocking=cache_blocking, save=True, dse=dse, dle=dle,
+        auto_tuning=auto_tuning, compiler=compiler, custom=custom
     )
 
     if not full_run:

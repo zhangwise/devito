@@ -5,7 +5,7 @@ from devito import Operator, Forward, Backward, t, time
 
 
 def ForwardOperator(model, u, src, rec, time_order=2, spc_order=6,
-                    save=False, u_ini=None, **kwargs):
+                    save=False, u_ini=None, custom=False, **kwargs):
     """
     Constructor method for the forward modelling operator in an acoustic media
 
@@ -52,7 +52,7 @@ def ForwardOperator(model, u, src, rec, time_order=2, spc_order=6,
     stencils = [eqn] + src_add + [rec_read]
 
     return Operator(stencils=stencils, subs=subs, dse=dse, dle=dle,
-                    time_axis=Forward, name="Forward")
+                    time_axis=Forward, name="Forward", custom=custom)
 
 
 def AdjointOperator(model, v, srca, rec, time_order=2, spc_order=6,

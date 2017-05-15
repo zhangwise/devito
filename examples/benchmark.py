@@ -4,6 +4,7 @@ from itertools import product
 from os import environ
 
 import numpy as np
+import pdb
 
 from devito import clear_cache
 from devito.compiler import compiler_registry
@@ -114,7 +115,22 @@ if __name__ == "__main__":
     if args.execmode == "run":
         parameters["space_order"] = parameters["space_order"][0]
         parameters["time_order"] = parameters["time_order"][0]
-        run(**parameters)
+        gflopss, oi, timings, [rec, data] = run(**parameters)
+        gflopss, oi, timings, [customrec, customdata] = run(custom=True, **parameters)
+        np.set_printoptions(threshold='nan')
+        recclose = np.allclose(rec, customrec, atol=10e-6, equal_nan=True)
+        dataclose = np.allclose(data, customdata, atol=10e-6, equal_nan=True)
+        recdiff = np.subtract(rec, customrec)
+        datadiff = np.subtract(data, customdata)
+        pdb.set_trace()
+        f = open("customrec.out", "w+")
+        f.write(np.array_str(customrec))
+        f = open("normalrec.out", "w+")
+        f.write(np.array_str(rec))
+        f = open("customdata.out", "w+")
+        f.write(np.array_str(customdata))
+        f = open("normaldata.out", "w+")
+        f.write(np.array_str(data))
     else:
         if args.benchmode == 'maxperf':
             parameters["auto_tuning"] = [True]

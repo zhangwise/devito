@@ -29,7 +29,7 @@ class Acoustic_cg(object):
             self.dt *= 1.73
 
     def Forward(self, save=False, cache_blocking=None, auto_tuning=False,
-                dse='advanced', dle='advanced', compiler=None, u_ini=None):
+                dse='advanced', dle='advanced', compiler=None, u_ini=None, custom=False):
         """
         Forward modelling
         """
@@ -65,7 +65,7 @@ class Acoustic_cg(object):
         fw = ForwardOperator(self.model, u, src, rec,
                              time_order=self.t_order, spc_order=self.s_order,
                              save=save, cache_blocking=cache_blocking, dse=dse,
-                             dle=dle, compiler=compiler, profile=True, u_ini=u_ini)
+                             dle=dle, compiler=compiler, profile=True, u_ini=u_ini, custom=custom)
 
         summary = fw.apply(autotune=auto_tuning)
         return rec.data, u, summary.gflopss, summary.oi, summary.timings

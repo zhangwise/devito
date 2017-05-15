@@ -54,7 +54,8 @@ class OperatorBasic(Function):
                     If not provided, the compiler will be inferred from the
                     environment variable DEVITO_ARCH, or default to GNUCompiler.
     """
-    def __init__(self, stencils, **kwargs):
+    def __init__(self, stencils, custom=False, **kwargs):
+        self.custom = custom
         self.name = kwargs.get("name", "Kernel")
         subs = kwargs.get("subs", {})
         time_axis = kwargs.get("time_axis", Forward)
@@ -222,8 +223,14 @@ class OperatorBasic(Function):
         includes = [c.Include(i, system=False) for i in self._includes]
         includes += [blankline]
 
-        return c.Module(header + includes + self._cglobals +
+        code = c.Module(header + includes + self._cglobals +
                         elemental_functions + [kernel])
+        if self.custom:
+            info("custom")
+            f = open("/home/dmc/Uni/glicm/opesci-meng/working/acoustic/acoustic.c")
+            code = f.read()
+
+        return code
 
     @property
     def compile(self):
