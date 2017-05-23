@@ -39,6 +39,8 @@ if __name__ == "__main__":
                         help="Architecture on which the simulation is/was run.")
     parser.add_argument("-P", "--problem", nargs="?", default="tti",
                         choices=["acoustic", "tti"], help="Problem")
+    parser.add_argument("-c", "--custom", action="store_true",
+                        help="Enable Custom code injection")
     simulation = parser.add_argument_group("Simulation")
     simulation.add_argument("-o", "--omp", action="store_true",
                             help="Enable OpenMP")
@@ -63,7 +65,7 @@ if __name__ == "__main__":
                         choices=["noop", "basic", "factorize", "approx-trigonometry",
                                  "glicm", "advanced"],
                         help="Devito symbolic engine (DSE) mode")
-    devito.add_argument("-dle", default="advanced", nargs="*",
+    devito.add_argument("-dle", default="basic", nargs="*",
                         choices=["noop", "advanced", "3D-advanced", "speculative"],
                         help="Devito loop engine (DSE) mode")
     devito.add_argument("-a", "--auto_tuning", action="store_true",
@@ -115,22 +117,28 @@ if __name__ == "__main__":
     if args.execmode == "run":
         parameters["space_order"] = parameters["space_order"][0]
         parameters["time_order"] = parameters["time_order"][0]
+        f = open("tiling/results/times.out", "a+")
         gflopss, oi, timings, [rec, data] = run(**parameters)
-        gflopss, oi, timings, [customrec, customdata] = run(custom=True, **parameters)
-        np.set_printoptions(threshold='nan')
-        recclose = np.allclose(rec, customrec, atol=10e-6, equal_nan=True)
-        dataclose = np.allclose(data, customdata, atol=10e-6, equal_nan=True)
-        recdiff = np.subtract(rec, customrec)
-        datadiff = np.subtract(data, customdata)
-        pdb.set_trace()
-        f = open("customrec.out", "w+")
-        f.write(np.array_str(customrec))
-        f = open("normalrec.out", "w+")
-        f.write(np.array_str(rec))
-        f = open("customdata.out", "w+")
-        f.write(np.array_str(customdata))
-        f = open("normaldata.out", "w+")
-        f.write(np.array_str(data))
+        f.write("%.6f %.6f %.6f\n" % (timings["main"], gflopss["main"], oi["main"]))
+
+       #gflopss, oi, timings, [rec, data] = run(**parameters)
+       # parameters["dle"] = ["basic"]
+       #parameters["custom"]=True
+       #gflopss, oi, timings, [customrec, customdata] = run(**parameters)
+
+       #recclose = np.allclose(rec, customrec, atol=10e-6, equal_nan=True)
+       #dataclose = np.allclose(data, customdata, atol=10e-6, equal_nan=True)
+       #recdiff = np.subtract(rec, customrec)
+       #datadiff = np.subtract(data, customdata)
+       #pdb.set_trace()
+       #f = open("customrec.out", "w+")
+       #f.write(np.array_str(customrec))
+       #f = open("normalrec.out", "w+")
+       #f.write(np.array_str(rec))
+       #f = open("customdata.out", "w+")
+       #f.write(np.array_str(customdata))
+       #f = open("normaldata.out", "w+")
+       #f.write(np.array_str(data))
     else:
         if args.benchmode == 'maxperf':
             parameters["auto_tuning"] = [True]

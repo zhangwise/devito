@@ -227,7 +227,7 @@ class Rewriter(object):
     """
     triggers = {
         '_avoid_denormals': ('basic', 'advanced', 'speculative'),
-        '_loop_fission': ('fission', 'split', 'advanced', 'speculative'),
+        '_loop_fission': ('fission', 'split',  'speculative'),
         '_create_elemental_functions': ('split', 'basic', 'advanced', 'speculative'),
         '_loop_blocking': ('blocking', 'advanced', 'speculative'),
         '_padding': ('padding', 'speculative'),
