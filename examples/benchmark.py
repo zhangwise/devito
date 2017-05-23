@@ -68,7 +68,7 @@ if __name__ == "__main__":
     devito.add_argument("-dle", default="basic", nargs="*",
                         choices=["noop", "advanced", "3D-advanced", "speculative"],
                         help="Devito loop engine (DSE) mode")
-    devito.add_argument("-a", "--auto_tuning", action="store_true",
+    devito.add_argument("-a", "--autotune", action="store_true",
                         help=("Benchmark with auto tuning on and off. " +
                               "Enables auto tuning when execmode is run"))
     devito.add_argument("-cb", "--cache_blocking", nargs=2, type=int,
@@ -141,18 +141,18 @@ if __name__ == "__main__":
        #f.write(np.array_str(data))
     else:
         if args.benchmode == 'maxperf':
-            parameters["auto_tuning"] = [True]
+            parameters["autotune"] = [True]
             parameters["dse"] = ["advanced"]
             parameters["dle"] = ["advanced"]
         elif args.benchmode == 'dse':
-            parameters["auto_tuning"] = [False]
+            parameters["autotune"] = [False]
             parameters["dse"] = ["basic",
                                  ('basic', 'glicm'),
                                  "advanced"]
             parameters["dle"] = ["basic"]
         else:
             # must be == 'dle'
-            parameters["auto_tuning"] = [True]
+            parameters["autotune"] = [True]
             parameters["dse"] = ["advanced"]
             parameters["dle"] = ["basic",
                                  "advanced"]

@@ -1,14 +1,13 @@
 import numpy as np
 
 from devito.logger import info
-from examples.acoustic.Acoustic_codegen import Acoustic_cg
-from examples.containers import IShot
-from examples.seismic import Model
+from examples.acoustic import AcousticWaveSolver
+from examples.seismic import Model, PointSource, Receiver
 
 
 # Velocity models
 def smooth10(vel, shape):
-    out = np.ones(shape)
+    out = np.ones(shape, dtype=np.float32)
     out[:, :] = vel[:, :]
     nx = shape[0]
 
@@ -26,14 +25,12 @@ def source(t, f0):
 
 
 def run(dimensions=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=1000.0,
-        time_order=2, space_order=4, nbpml=40, dse='advanced', dle='advanced',
-        auto_tuning=False, compiler=None, cache_blocking=None, full_run=False, custom=False):
+        time_order=2, space_order=4, nbpml=40, full_run=False, custom=False, **kwargs):
 
-    dle = 'basic'
     origin = (0., 0., 0.)
 
     # True velocity
-    true_vp = np.ones(dimensions) + .5
+    true_vp = np.ones(dimensions, dtype=np.float32) + .5
     if len(dimensions) == 2:
         true_vp[:, int(dimensions[0] / 2):dimensions[0]] = 2.5
     else:
@@ -42,13 +39,10 @@ def run(dimensions=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=1000.0,
     # Smooth velocity
     initial_vp = smooth10(true_vp, dimensions)
 
-    dm = 1. / (true_vp * true_vp) - 1. / (initial_vp * initial_vp)
-
     model = Model(origin, spacing, dimensions, true_vp, nbpml=nbpml)
 
-    # Define seismic data.
-    data = IShot()
-    src = IShot()
+    dm = model.pad(1. / (true_vp * true_vp) - 1. / (initial_vp * initial_vp))
+
     f0 = .010
     dt = model.critical_dt
     if time_order == 4:
@@ -58,16 +52,13 @@ def run(dimensions=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=1000.0,
 
     # Source geometry
     time_series = np.zeros((nt, 1))
-
     time_series[:, 0] = source(np.linspace(t0, tn, nt), f0)
 
     location = np.zeros((1, 3))
     location[0, 0] = origin[0] + dimensions[0] * spacing[0] * 0.5
     location[0, 1] = origin[1] + dimensions[1] * spacing[1] * 0.5
     location[0, 2] = origin[1] + 2 * spacing[2]
-    src.set_receiver_pos(location)
-    src.set_shape(nt, 1)
-    src.set_traces(time_series)
+    src = PointSource(name='src', data=time_series, coordinates=location)
 
     # Receiver geometry
     receiver_coords = np.zeros((101, 3))
@@ -75,29 +66,26 @@ def run(dimensions=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=1000.0,
                                         dimensions[0] * spacing[0], num=101)
     receiver_coords[:, 1] = origin[1] + dimensions[1] * spacing[1] * 0.5
     receiver_coords[:, 2] = location[0, 1]
-    data.set_receiver_pos(receiver_coords)
-    data.set_shape(nt, 101)
+    rec = Receiver(name='rec', ntime=nt, coordinates=receiver_coords)
 
-    Acoustic = Acoustic_cg(model, data, src, nbpml=nbpml, t_order=time_order,
-                           s_order=space_order, auto_tuning=auto_tuning, dse=dse,
-                           dle=dle, compiler=compiler)
+    # Create wave solver from model, source and receiver definitions
+    solver = AcousticWaveSolver(model, source=src, receiver=rec,
+                                time_order=time_order,
+                                space_order=space_order, **kwargs)
 
     info("Applying Forward")
-    rec, u, gflopss, oi, timings = Acoustic.Forward(
-        cache_blocking=cache_blocking, save=True, dse=dse, dle=dle,
-        auto_tuning=auto_tuning, compiler=compiler, custom=custom
-    )
+    rec, u, summary = solver.forward(save=full_run, **kwargs)
 
     if not full_run:
-        return gflopss, oi, timings, [rec, u.data]
+        return summary.gflopss, summary.oi, summary.timings, [rec, u.data]
 
     info("Applying Adjoint")
-    Acoustic.Adjoint(rec, dse=dse, dle=dle)
+    solver.adjoint(rec, **kwargs)
     info("Applying Born")
-    Acoustic.Born(dm, dse=dse, dle=dle)
+    solver.born(dm, **kwargs)
     info("Applying Gradient")
-    Acoustic.Gradient(rec, u, dse=dse, dle=dle)
+    solver.gradient(rec.data, u, **kwargs)
 
 
 if __name__ == "__main__":
-    run(full_run=True, auto_tuning=False, space_order=6, time_order=2)
+    run(full_run=True, autotune=False, space_order=6, time_order=2)

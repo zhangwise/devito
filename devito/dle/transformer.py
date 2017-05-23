@@ -1,81 +1,54 @@
-from __future__ import absolute_import
+from collections import Sequence
 
-from collections import OrderedDict, Sequence, namedtuple
-from itertools import combinations
-from operator import attrgetter
-from time import time
-
-import cgen as c
-import cpuinfo
-import numpy as np
-import psutil
-
-from devito.dimension import Dimension
-from devito.dle import (compose_nodes, copy_arrays,
-                        filter_iterations, retrieve_iteration_tree)
-from devito.dse import (as_symbol, estimate_cost, promote_scalar_expressions, terminals)
-from devito.interfaces import ScalarFunction, TensorFunction
-from devito.logger import dle, dle_warning
-from devito.nodes import (Block, Denormals, Element, Expression, FunCall,
-                          Function, Iteration, List)
-from devito.tools import as_tuple, filter_sorted, flatten, grouper, roundm
-from devito.visitors import (FindNodes, FindSections, FindSymbols,
-                             IsPerfectIteration, SubstituteExpression, Transformer)
+from devito.dle.backends import (State, BasicRewriter, DevitoCustomRewriter,
+                                 DevitoRewriter, DevitoSpeculativeRewriter, YaskRewriter)
+from devito.exceptions import DLEException
+from devito.logger import dle_warning
 
 
-def transform(node, mode='basic', compiler=None):
+modes = {
+    'basic': BasicRewriter,
+    'advanced': DevitoRewriter,
+    'speculative': DevitoSpeculativeRewriter,
+    'yask': YaskRewriter
+}
+
+
+def transform(node, mode='basic', options=None, compiler=None):
     """
     Transform Iteration/Expression trees to generate highly optimized C code.
 
     :param node: The Iteration/Expression tree to be transformed, or an iterable
                  of Iteration/Expression trees.
-    :param mode: Drive the tree transformation. ``mode`` can be a string indicating
-                 a pre-established optimization sequence or a tuple of individual
-                 transformations; in the latter case, the specified transformations
-                 are composed. We use the following convention: ::
+    :param mode: Drive the tree transformation. ``mode`` is a string indicating
+                 a certain optimization pipeline. The following values are accepted: ::
 
-                    * [S]: a pre-defined sequence of transformations.
-                    * [T]: a single transformation.
-                    * [sT]: a single "speculative" transformation; that is, a
-                            transformation that might increase, or even decrease,
-                            performance.
+                     * 'noop': Do nothing.
+                     * 'basic': Add instructions to avoid denormal numbers and create
+                                elemental functions for rapid JIT-compilation.
+                     * 'advanced': 'basic', vectorization, loop blocking.
+                     * '3D-advanced': Like 'advanced', but attempt 3D loop blocking.
+                     * 'speculative': Apply all of the 'advanced' transformations,
+                                      plus other transformations that might increase
+                                      (or possibly decrease) performance.
+                     * 'yask': Optimize by offloading to the YASK optimizer. Still
+                               work-in-progress; should only be used by developers.
+    :param options: A dictionary with additional information to drive the DLE. The
+                    following values are accepted: ::
 
-                 The keywords usable in/as ``mode`` are: ::
-
-                    * 'noop': Do nothing -- [S]
-                    * 'basic': Apply all of the available legal transformations
-                               that are most likely to increase performance (ie, all
-                               [T] listed below), except for loop blocking -- [S]
-                    * 'advanced': Like 'basic', but also switches on loop blocking -- [S]
-                    * '3D-advanced': Like 'advanced', but apply 3D loop blocking
-                                     if there are at least the perfectly nested
-                                     parallel iteration spaces -- [S]
-                    * 'speculative': Apply all of the 'advanced' transformations,
-                                     plus other transformations that might increase
-                                     (or possibly decrease) performance -- [S]
-                    * 'fission': Apply loop fission -- [T]
-                    * 'blocking': Apply loop blocking -- [T]
-                    * 'split': Identify and split elemental functions -- [T]
-                    * 'padding': Introduce "shadow" arrays, padded to the nearest
-                                 multiple of the vector length, to maximize data
-                                 alignment -- [T]
-                    * 'simd': Add pragmas to trigger compiler auto-vectorization -- [T]
-                    * 'ntstores': Add pragmas to issue nontemporal stores -- [sT]
-
-                 If ``mode`` is a tuple, the last entry may be used to provide optional
-                 arguments to the DLE transformations. Accepted key-value pairs are: ::
-
-                    * 'blockshape': A tuple representing the shape of a block created
-                                    by loop blocking.
-                    * 'blockinner': By default, loop blocking is not applied to the
-                                    innermost dimension of an Iteration/Expression tree
-                                    to maximize the chances of SIMD vectorization. To
-                                    force the blocking of this loop, the ``blockinner``
-                                    flag should be set to True.
-                    * 'openmp': True to emit OpenMP code, False otherwise.
+                        * 'blockshape': A tuple representing the shape of a block created
+                                        by loop blocking.
+                        * 'blockinner': By default, loop blocking is not applied to the
+                                        innermost dimension of an Iteration/Expression
+                                        tree to maximize vectorization. Set this flag to
+                                        True to override this heuristic.
+                        * 'openmp': True to emit OpenMP code, False otherwise.
     :param compiler: Compiler class used to perform JIT compilation. Useful to
                      introduce compiler-specific vectorization pragmas.
     """
+    # Check input options
+    if not (mode is None or isinstance(mode, str)):
+        raise ValueError("Parameter 'mode' should be a string, not %s." % type(mode))
 
     if isinstance(node, Sequence):
         assert all(n.is_Node for n in node)
@@ -85,18 +58,27 @@ def transform(node, mode='basic', compiler=None):
     else:
         raise ValueError("Got illegal node of type %s." % type(node))
 
-    if not mode:
+    options = options or {}
+    params = options.copy()
+    for i in options:
+        if i not in ('blockshape', 'blockinner', 'openmp'):
+            dle_warning("Illegal DLE parameter '%s'" % i)
+            params.pop(i)
+
+    # Process the Iteration/Expression tree through the DLE
+    if mode is None or mode == 'noop':
         return State(node)
-    elif isinstance(mode, str):
-        mode = list([mode])
-    elif not isinstance(mode, Sequence):
-        return State(node)
-    else:
+    elif mode == '3D-advanced':
+        params['blockinner'] = True
+        mode = 'advanced'
+    elif mode not in modes:
         try:
-            mode = list(mode)
-        except TypeError:
-            dle_warning("Arg mode must be str or tuple (got %s)" % type(mode))
+            rewriter = DevitoCustomRewriter(node, mode, params, compiler)
+            return rewriter.run()
+        except DLEException:
+            dle_warning("Unknown transformer mode(s) %s" % mode)
             return State(node)
+<<<<<<< HEAD
 
     params = {}
     if isinstance(mode[-1], dict):
@@ -860,14 +842,5 @@ def get_simd_flag():
                 get_simd_flag.flag = i
                 return i
     else:
-        # "Cached" because calls to cpuingo are expensive
-        return get_simd_flag.flag
-get_simd_flag.flag = None  # noqa
-
-
-def get_simd_items(dtype):
-    """Determine the number of items of type ``dtype`` that can fit in a SIMD
-    register on the current architecture."""
-
-    simd_size = simdinfo[get_simd_flag()]
-    return simd_size / np.dtype(dtype).itemsize
+        rewriter = modes[mode](node, params, compiler)
+        return rewriter.run()
