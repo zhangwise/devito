@@ -28,7 +28,7 @@ class Argument(object):
     def __init__(self, name, provider, default_value=None):
         self.name = name
         self.provider = provider
-        self._value = self._default_value = default_value
+        self._value = self.default_value = default_value
 
     @property
     def value(self):
@@ -47,7 +47,7 @@ class Argument(object):
         return self.name
 
     def reset(self):
-        self._value = self._default_value
+        self._value = self.default_value
 
     def verify(self, kwargs):
         raise NotImplemented()
@@ -94,7 +94,7 @@ class TensorArgument(Argument):
     def __init__(self, name, provider, dtype):
         super(TensorArgument, self).__init__(name, provider)
         self.dtype = dtype
-        self._value = self._default_value = self.provider
+        self._value = self.default_value = self.provider
 
     @property
     def value(self):
@@ -168,7 +168,11 @@ class DimensionArgProvider(ArgumentProvider):
 
     @property
     def value(self):
-        return self._value
+        if self.size is not None:
+            return self.size
+        else:
+            child_values = tuple([i.value for i in self.args])
+            return child_values if all(child_values) else None
 
     @property
     def dtype(self):
@@ -180,8 +184,9 @@ class DimensionArgProvider(ArgumentProvider):
         if self.size is not None:
             return []
         else:
-            size = ScalarArgument("%s_size" % self.name, self, max)
-            return [size]
+            start = ScalarArgument("%s_s" % self.name, self, max, 0)
+            end = ScalarArgument("%s_e" % self.name, self, max)
+            return [start, end]
 
     @property
     def ccode(self):
@@ -189,11 +194,13 @@ class DimensionArgProvider(ArgumentProvider):
         if self.size is not None:
             return "%d" % self.size
         else:
-            return self.rtargs[0].ccode
+            # If we have start and end variables, the "size" of the dimension is now:
+            return "%s - %s" % (end.ccode, start.ccode)
 
     @property
     def decl(self):
-        return self.rtargs[0].decl
+        # It no longer makes sense to declare a variable for dimension size
+        raise NotImplemented()
 
     # TODO: Do I need a verify on a dimension?
     def verify(self, value):
@@ -210,12 +217,15 @@ class DimensionArgProvider(ArgumentProvider):
             # be bigger than my size if I have a hard-coded size
             verify = (value >= self.size)
         else:
-            if value is not None and self._value is not None:
-                value = self.reducer(self._value, value)
+            if not (isinstance(value, tuple) and len(value)==2):
+                if isinstance(value, Iterable):
+                    raise InvalidArgument("Expected either a single value or a tuple(2)")
+                value = (self.rtargs[0].default_value, value)
+    
             if hasattr(self, 'parent'):
                 verify = verify and self.parent.verify(value)
                 # If I don't know my value, ask my parent
-                if value is None:
+                if self._value is None:
                     value = self.parent.value
 
             # Derived dimensions could be linked through constraints
@@ -223,8 +233,7 @@ class DimensionArgProvider(ArgumentProvider):
             # dim_e - dim_s < SOME_MAX
             # Also need a default constraint that dim_e > dim_s (or vice-versa)
             verify = verify and all([a.verify(v) for a, v in zip(self.rtargs, (value,))])
-            if verify:
-                self._value = value
+
         return verify
 
 
