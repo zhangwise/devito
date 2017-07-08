@@ -102,7 +102,7 @@ class OperatorBasic(Function):
         parameters = FindSymbols('kernel-data').visit(nodes)
         dimensions = FindSymbols('dimensions').visit(nodes)
         dimensions += [d.parent for d in dimensions if d.is_Buffered]
-        parameters += filter_ordered([d for d in dimensions if d.size is None],
+        parameters += filter_ordered([d for d in dimensions if not d.is_Fixed],
                                      key=operator.attrgetter('name'))
 
         # Resolve and substitute dimensions for loop index variables
@@ -298,7 +298,7 @@ class OperatorBasic(Function):
                 needed = entries[index:]
 
                 # Build and insert the required Iterations
-                iters = [Iteration([], j.dim, j.dim.size, offsets=j.ofs) for j in needed]
+                iters = [Iteration([], j.dim, j.dim.limits, offsets=j.ofs) for j in needed]
                 body, tree = compose_nodes(iters + [expressions], retrieve=True)
                 scheduling = OrderedDict(zip(needed, tree))
                 if root is None:

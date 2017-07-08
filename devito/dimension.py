@@ -1,16 +1,16 @@
 from sympy import Number, Symbol
-from devito.arguments import DimensionArgProvider
+from devito.arguments import DimensionArgProvider, FixedDimensionArgProvider
 
 __all__ = ['Dimension', 'x', 'y', 'z', 't', 'p', 'd', 'time']
 
 
-class Dimension(Symbol, DimensionArgProvider):
+class FixedDimension(Symbol, FixedDimensionArgProvider):
 
+    is_Fixed = True
     is_Buffered = False
     is_Lowered = False
 
-    """Index object that represents a problem dimension and thus
-    defines a potential iteration space.
+    """Index object that represents a problem dimension fixed in size 
 
     :param size: Optional, size of the array dimension.
     :param reverse: Traverse dimension in reverse order (default False)
@@ -30,10 +30,36 @@ class Dimension(Symbol, DimensionArgProvider):
     @property
     def symbolic_size(self):
         """The symbolic size of this dimension."""
-        try:
-            return Number(self.ccode)
-        except ValueError:
-            return Symbol(self.ccode)
+        return Number(self.ccode)
+
+    
+class Dimension(Symbol, DimensionArgProvider):
+
+    is_Fixed = False
+    is_Buffered = False
+    is_Lowered = False
+
+    """Index object that represents a problem dimension and thus
+    defines a potential iteration space.
+
+    :param size: Optional, size of the array dimension.
+    :param reverse: Traverse dimension in reverse order (default False)
+    :param buffered: Optional, boolean flag indicating whether to
+                     buffer variables when iterating this dimension.
+    """
+
+    def __new__(cls, name, **kwargs):
+        newobj = Symbol.__new__(cls, name)
+        newobj.reverse = kwargs.get('reverse', False)
+        return newobj
+    
+    def __str__(self):
+        return self.name
+
+    @property
+    def symbolic_size(self):
+        """The symbolic size of this dimension."""
+        return Symbol(self.ccode)
 
 
 class BufferedDimension(Dimension):
