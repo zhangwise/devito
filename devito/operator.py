@@ -180,12 +180,15 @@ class OperatorBasic(Function):
     def _dle_arguments(self, dim_sizes):
         # Add user-provided block sizes, if any
         dle_arguments = OrderedDict()
+        print(dim_sizes)
         for i in self._dle_state.arguments:
-            dim_size = dim_sizes.get(i.original_dim.name, i.original_dim.size)
+            dim_size = dim_sizes.get(i.original_dim.name, i.original_dim.value)
             if dim_size is None:
                 error('Unable to derive size of dimension %s from defaults. '
                       'Please provide an explicit value.' % i.original_dim.name)
                 raise InvalidArgument('Unknown dimension size')
+            if isinstance(dim_size, tuple) and len(dim_size) == 2:
+                dim_size = dim_size[1] - dim_size[0]
             if i.value:
                 try:
                     dle_arguments[i.argument.name] = i.value(dim_size)

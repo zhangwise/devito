@@ -76,7 +76,6 @@ class ScalarArgument(Argument):
         return np.int32
 
     def verify(self, value):
-        # Assuming self._value was initialised as appropriate for the reducer
         if value is not None:
             if self._value is not None:
                 self._value = self.reducer(self._value, value)
@@ -200,7 +199,7 @@ class DimensionArgProvider(ArgumentProvider):
 
     @property
     def value(self):
-        child_values = tuple([i.value for i in self.args])
+        child_values = tuple([i.value for i in self.rtargs])
         return child_values if all(i is not None for i in child_values) else None
 
     @cached_property
@@ -223,7 +222,6 @@ class DimensionArgProvider(ArgumentProvider):
 
     def verify(self, value):
         verify = True
-
         if value is None:
             if self._value is not None:
                 return True
@@ -255,7 +253,6 @@ class DimensionArgProvider(ArgumentProvider):
         # dim_e - dim_s < SOME_MAX
         # Also need a default constraint that dim_e > dim_s (or vice-versa)
         verify = verify and all([a.verify(v) for a, v in zip(self.rtargs, value)])
-
         return verify
 
 class SymbolicDataArgProvider(ArgumentProvider):
