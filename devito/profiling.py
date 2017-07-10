@@ -140,6 +140,7 @@ class Profiler(object):
 
             # Flops
             itershape = [i.extent(finish=dim_sizes.get(dims[i].name)) for i in itspace]
+            print(itershape)
             iterspace = reduce(operator.mul, itershape)
             flops = float(profile.ops*iterspace)
             gflops = flops/10**9
