@@ -7,6 +7,7 @@ from devito.dimension import Dimension, t
 from devito.dse.search import retrieve_indexed, retrieve_ops, search
 from devito.logger import warning
 from devito.tools import flatten
+from devito.arguments import ScalarArgument
 
 __all__ = ['estimate_cost', 'estimate_memory', 'indexify', 'as_symbol',
            'terminals', 'tolambda']
@@ -142,7 +143,7 @@ def as_symbol(expr):
         pass
     if isinstance(expr, str):
         return Symbol(expr)
-    elif isinstance(expr, Dimension):
+    elif isinstance(expr, ScalarArgument):
         return Symbol(expr.name)
     elif expr.is_Symbol:
         return expr

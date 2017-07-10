@@ -20,7 +20,7 @@ from collections import Iterable
 
 class Argument(object):
 
-    """ Abstract base class for any object that represents a run time argument for
+    """ Base class for any object that represents a run time argument for
         generated kernels.
     """
 
@@ -32,6 +32,9 @@ class Argument(object):
         self.provider = provider
         self._value = self.default_value = default_value
 
+    def __str__(self):
+        return "%s (%s)" % (self.name, str(self.value))
+        
     @property
     def value(self):
         return self._value
@@ -111,7 +114,7 @@ class TensorArgument(Argument):
     @property
     def ccast(self):
         alignment = "__attribute__((aligned(64)))"
-        shape = ''.join(["[%s]" % i.ccode for i in self.provider.indices[1:]])
+        shape = ''.join(["[%s]" % i.rtargs[1].ccode for i in self.provider.indices[1:]])
 
         cast = c.Initializer(c.POD(self.dtype,
                                    '(*restrict %s)%s %s' % (self.name, shape, alignment)),
@@ -195,7 +198,8 @@ class DimensionArgProvider(ArgumentProvider):
         self.reset()
 
     def reset(self):
-        self._value = self._default_value
+        for i in self.args:
+            i.reset()
 
     @property
     def value(self):
@@ -223,7 +227,7 @@ class DimensionArgProvider(ArgumentProvider):
     def verify(self, value):
         verify = True
         if value is None:
-            if self._value is not None:
+            if self.value is not None:
                 return True
             else:
                 # If I don't know my value, ask my parent
@@ -234,7 +238,7 @@ class DimensionArgProvider(ArgumentProvider):
                 except AttributeError:
                     return False
 
-        if value == self._value:
+        if value == self.value:
             return True
 
         if not (isinstance(value, tuple) and len(value)==2):

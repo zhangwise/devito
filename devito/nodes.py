@@ -414,12 +414,14 @@ class Iteration(Node):
         ``finish``). ``None`` is used as a placeholder in the returned 2-tuple
         if a limit is unknown."""
         try:
-            start = int(self.limits[0]) - self.offsets[0]
+            if start is None:
+                start = int(self.limits[0]) - self.offsets[0]
         except (TypeError, ValueError):
             if not start:
                 start = None
         try:
-            finish = int(self.limits[1]) - self.offsets[1]
+            if finish is None:
+                finish = int(self.limits[1]) - self.offsets[1]
         except (TypeError, ValueError):
             if not finish:
                 finish = None

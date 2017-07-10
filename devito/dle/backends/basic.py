@@ -71,10 +71,15 @@ class BasicRewriter(AbstractRewriter):
                 # Determine the arguments required by the elemental function
                 in_scope = [i.dim for i in tree[tree.index(root):]]
                 required = FindSymbols(mode='free-symbols').visit(root)
+                print("***")
+                print(required)
+                print("***")
                 for i in FindSymbols('symbolics').visit(root):
-                    required.extend(flatten(j.free_symbols for j in i.symbolic_shape))
+                    required.extend(flatten(j.rtargs for j in i.indices))
+                print("%%%")
+                print(required)
+                print("%%%")
                 required = set([as_symbol(i) for i in required if i not in in_scope])
-
                 # Add tensor arguments
                 args = []
                 seen = {e.output for e in expressions if e.is_scalar}
@@ -89,7 +94,7 @@ class BasicRewriter(AbstractRewriter):
                 handle = filter_sorted(required - seen, key=attrgetter('name'))
                 args.extend([(i.name, ScalarFunction(name=i.name, dtype=np.int32))
                              for i in handle])
-
+                print(args)
                 # Track info to transform the main tree
                 call, parameters = zip(*args)
                 mapper[view] = (List(header=noinline, body=FunCall(name, call)), [root])

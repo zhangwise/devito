@@ -180,7 +180,6 @@ class OperatorBasic(Function):
     def _dle_arguments(self, dim_sizes):
         # Add user-provided block sizes, if any
         dle_arguments = OrderedDict()
-        print(dim_sizes)
         for i in self._dle_state.arguments:
             dim_size = dim_sizes.get(i.original_dim.name, i.original_dim.value)
             if dim_size is None:

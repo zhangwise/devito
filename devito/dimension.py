@@ -61,6 +61,10 @@ class Dimension(Symbol, DimensionArgProvider):
         """The symbolic size of this dimension."""
         return Symbol(self.ccode)
 
+    @property
+    def size(self):
+        return None
+
 
 class BufferedDimension(Dimension):
 
