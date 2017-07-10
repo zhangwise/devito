@@ -226,17 +226,15 @@ class DimensionArgProvider(ArgumentProvider):
 
     def verify(self, value):
         verify = True
+        print("(%s) Value passed: %s, old value: %s" % (self.name, str(value), str(self.value)))
         if value is None:
-            if self.value is not None:
-                return True
-            else:
-                # If I don't know my value, ask my parent
-                try:
-                    value = self.parent.value
-                    if value is None: # Still
-                        return False
-                except AttributeError:
+            # If I don't know my value, ask my parent
+            try:
+                value = self.parent.value
+                if value is None: # Still
                     return False
+            except AttributeError:
+                return False
 
         if value == self.value:
             return True
@@ -257,6 +255,7 @@ class DimensionArgProvider(ArgumentProvider):
         # dim_e - dim_s < SOME_MAX
         # Also need a default constraint that dim_e > dim_s (or vice-versa)
         verify = verify and all([a.verify(v) for a, v in zip(self.rtargs, value)])
+        print("(%s) new value: %s" % (self.name, self.value))
         return verify
 
 class SymbolicDataArgProvider(ArgumentProvider):
@@ -300,4 +299,5 @@ def log_args(arguments):
                            (k, str(v.shape), np.linalg.norm(v)))
         else:
             arg_str.append('(%s, value=%s)' % (k, str(v)))
+    print("Passing Arguments: " + ", ".join(arg_str))
     debug("Passing Arguments: " + ", ".join(arg_str))

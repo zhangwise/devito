@@ -148,10 +148,7 @@ class DevitoRewriter(BasicRewriter):
                     dim = blocked.setdefault(i, Dimension("%s_block" % i.dim.name))
                     block_size = dim.symbolic_size
                     iter_size = i.dim.symbolic_size
-                    print(iter_size)
-                    print(type(iter_size))
-                    print(i.limits[0])
-                    print(type(i.limits[0]))
+
                     finish = iter_size - i.offsets[1]
                     start = i.limits[0] - i.offsets[0]
                     finish = finish - ((finish - i.offsets[1]) % block_size)
