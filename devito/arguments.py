@@ -114,7 +114,7 @@ class TensorArgument(Argument):
     @property
     def ccast(self):
         alignment = "__attribute__((aligned(64)))"
-        shape = ''.join(["[%s]" % i.rtargs[1].ccode for i in self.provider.indices[1:]])
+        shape = ''.join(["[%s]" % i.size for i in self.provider.indices[1:]])
 
         cast = c.Initializer(c.POD(self.dtype,
                                    '(*restrict %s)%s %s' % (self.name, shape, alignment)),
@@ -218,6 +218,7 @@ class DimensionArgProvider(ArgumentProvider):
         # If we have start and end variables, the "size" of the dimension is now:
         start, end = self.rtargs
         return "%s - %s" % (end.ccode, start.ccode)
+    
 
     @property
     def limits(self):

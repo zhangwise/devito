@@ -4,7 +4,7 @@ import pytest
 
 from sympy import Eq, cos  # noqa
 
-from devito.dimension import Dimension, t, x, y, z
+from devito.dimension import Dimension, t, x, y, z, FixedDimension
 from devito.interfaces import DenseData, ScalarFunction, TensorFunction
 from devito.nodes import Iteration
 from devito.tools import as_tuple
@@ -24,12 +24,12 @@ def densedata(name, shape, dimensions):
 
 @pytest.fixture(scope="session")
 def dims():
-    return {'i': Dimension(name='i', size=3),
-            'j': Dimension(name='j', size=5),
-            'k': Dimension(name='k', size=7),
-            'l': Dimension(name='l', size=6),
-            's': Dimension(name='s', size=4),
-            'q': Dimension(name='q', size=4)}
+    return {'i': FixedDimension(name='i', size=3),
+            'j': FixedDimension(name='j', size=5),
+            'k': FixedDimension(name='k', size=7),
+            'l': FixedDimension(name='l', size=6),
+            's': FixedDimension(name='s', size=4),
+            'q': FixedDimension(name='q', size=4)}
 
 
 @pytest.fixture(scope="session")

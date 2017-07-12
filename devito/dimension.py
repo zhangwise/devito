@@ -63,7 +63,8 @@ class Dimension(Symbol, DimensionArgProvider):
 
     @property
     def size(self):
-        return None
+        _, end = self.rtargs
+        return Symbol(end.name)
 
 
 class BufferedDimension(Dimension):
