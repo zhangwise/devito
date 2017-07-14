@@ -33,7 +33,7 @@ class FixedDimension(Symbol, FixedDimensionArgProvider):
         return Number(self.ccode)
 
     
-class Dimension(Symbol, DimensionArgProvider):
+class OpenDimension(Symbol, DimensionArgProvider):
 
     is_Fixed = False
     is_Buffered = False
@@ -65,6 +65,16 @@ class Dimension(Symbol, DimensionArgProvider):
     def size(self):
         _, end = self.rtargs
         return Symbol(end.name)
+
+
+class Dimension(OpenDimension, FixedDimension):
+    @size.setter
+    def size(self, size):
+        if size is None:
+            self.__class__ = OpenDimension
+        else:
+            self.__class__ = FixedDimension
+            self.size = size
 
 
 class BufferedDimension(Dimension):

@@ -261,9 +261,6 @@ class DimensionArgProvider(ArgumentProvider):
         return verify
 
 class SymbolicDataArgProvider(ArgumentProvider):
-
-class SymbolicDataArgProvider(ArgumentProvider):
-
     """ Class used to decorate Symbolic Data objects with behaviour required for runtime
         arguments.
     """
