@@ -225,6 +225,7 @@ class DimensionArgProvider(ArgumentProvider):
         start, end = self.rtargs
         return (Symbol(start.ccode), Symbol(end.ccode), 1)
 
+    # TODO: Can we do without a verify on a dimension?
     def verify(self, value):
         verify = True
         print("(%s) Value passed: %s, old value: %s" % (self.name, str(value), str(self.value)))
@@ -258,6 +259,8 @@ class DimensionArgProvider(ArgumentProvider):
         verify = verify and all([a.verify(v) for a, v in zip(self.rtargs, value)])
         print("(%s) new value: %s" % (self.name, self.value))
         return verify
+
+class SymbolicDataArgProvider(ArgumentProvider):
 
 class SymbolicDataArgProvider(ArgumentProvider):
 
