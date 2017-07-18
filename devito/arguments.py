@@ -159,6 +159,9 @@ class FixedDimensionArgProvider(ArgumentProvider):
     def value(self):
         return self.size
 
+    def reset(self):
+        pass
+
     @property
     def dtype(self):
         """The data type of the iteration variable"""
@@ -177,11 +180,19 @@ class FixedDimensionArgProvider(ArgumentProvider):
         raise NotImplemented()
 
     def verify(self, value):
+        if isinstance(value, tuple) and value[0] == 0:
+            _, value = value
+
+        if value is None:
+            return True
+        
+        print("(%s) Value passed: %s, my size: %s" % (self.name, str(value), str(self.size)))
         return (value >= self.size)
 
     @property
     def limits(self):
         return (0, self.size, 1)
+
 
 class DimensionArgProvider(ArgumentProvider):
 
@@ -198,7 +209,7 @@ class DimensionArgProvider(ArgumentProvider):
         self.reset()
 
     def reset(self):
-        for i in self.args:
+        for i in self.rtargs:
             i.reset()
 
     @property
@@ -217,6 +228,7 @@ class DimensionArgProvider(ArgumentProvider):
         """C-level variable name of this dimension"""
         # If we have start and end variables, the "size" of the dimension is now:
         start, end = self.rtargs
+        raise NotImplemented()
         return "%s - %s" % (end.ccode, start.ccode)
     
 
@@ -225,11 +237,22 @@ class DimensionArgProvider(ArgumentProvider):
         start, end = self.rtargs
         return (Symbol(start.ccode), Symbol(end.ccode), 1)
 
+    def promote(self, value):
+        if not (isinstance(value, tuple) and len(value)==2):
+            if isinstance(value, Iterable):
+                raise InvalidArgument("Expected either a single value or a tuple(2)")
+            start, _ = self.rtargs
+            value = (start.default_value, value)
+        return value
+
     # TODO: Can we do without a verify on a dimension?
     def verify(self, value):
         verify = True
         print("(%s) Value passed: %s, old value: %s" % (self.name, str(value), str(self.value)))
         if value is None:
+            if self.value is not None:
+                return True
+            
             # If I don't know my value, ask my parent
             try:
                 value = self.parent.value
@@ -241,17 +264,19 @@ class DimensionArgProvider(ArgumentProvider):
         if value == self.value:
             return True
 
-        if not (isinstance(value, tuple) and len(value)==2):
-            if isinstance(value, Iterable):
-                raise InvalidArgument("Expected either a single value or a tuple(2)")
-            start, _ = self.rtargs
-            value = (start.default_value, value)
-    
+        value = self.promote(value)
+
         try:
+            parent_val = self.parent.value
+            if parent_val is not None:
+                parent_val = self.promote(parent_val)
+                print(value)
+                print(parent_val)
+                value = tuple([self.reducer(i1, i2) for i1, i2 in zip(value, parent_val)])
             verify = verify and self.parent.verify(value)
         except AttributeError:
             pass
-
+        
         # Derived dimensions could be linked through constraints
         # At this point, a constraint needs to be added that enforces
         # dim_e - dim_s < SOME_MAX

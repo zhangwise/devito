@@ -192,6 +192,9 @@ class Operator(Function):
         for d, v in dim_sizes.items():
             assert(dim_names[d].verify(v))
 
+        for p in self.parameters:
+            assert(p.verify(None))
+
         arguments = self._default_args()
 
         arguments.update(self._extra_arguments())

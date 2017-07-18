@@ -67,12 +67,20 @@ class OpenDimension(Symbol, DimensionArgProvider):
         return Symbol(end.name)
 
 
-class Dimension(OpenDimension, FixedDimension):
+class Dimension(OpenDimension):
+
+    @property
+    def size(self):
+        return super(Dimension, self).size
+    
     @size.setter
     def size(self, size):
         if size is None:
+            print("Type set to open")
+            self.size = None
             self.__class__ = OpenDimension
         else:
+            print("Type set to fixed")
             self.__class__ = FixedDimension
             self.size = size
 
