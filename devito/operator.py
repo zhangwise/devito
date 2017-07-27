@@ -150,12 +150,13 @@ class Operator(Function):
         """ Process any apply-time arguments passed to apply and derive values for
             any remaining arguments
         """
+        print(self.name)
         new_params = {}
         # If we've been passed CompositeData objects as kwargs, they might have children
         # that need to be substituted as well.
         for k, v in kwargs.items():
             if isinstance(v, CompositeData):
-                orig_param_l = [i for i in self.symbolic_data if i.name == k]
+                orig_param_l = [i for i in self.symbolic_data if i.name == k] # Use filter
                 # If I have been passed a parameter, I must have seen it before
                 if len(orig_param_l) == 0:
                     raise InvalidArgument("Parameter %s does not exist in expressions " +
@@ -173,12 +174,13 @@ class Operator(Function):
             assert(ta.verify(kwargs.pop(ta.name, None)))
 
         for d in self.dims:
-            d.verify(kwargs.pop(d.name, None))
+            d.verify(kwargs.pop(d.name, None), enforce=True)
 
         for s in self.scalar_args:
-            s.verify(kwargs.pop(s.name, None))
+            s.verify(kwargs.pop(s.name, None), enforce=True)
 
         dim_sizes = OrderedDict([(d.name, d.value) for d in self.dims])
+
         dim_names = OrderedDict([(d.name, d) for d in self.dims])
         dle_arguments, autotune = self._dle_arguments(dim_sizes)
         dim_sizes.update(dle_arguments)
@@ -273,8 +275,11 @@ class Operator(Function):
         """
         if self._lib is None:
             # No need to recompile if a shared object has already been loaded.
-            return jit_compile(self.ccode, configuration['compiler'])
+            name = jit_compile(self.ccode, configuration['compiler'])
+            print(self.name+":"+name)
+            return name
         else:
+            print(self.name+":"+self._lib.name)
             return self._lib.name
 
     @property

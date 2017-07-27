@@ -69,6 +69,7 @@ class ScalarArgument(Argument):
     def __init__(self, name, provider, reducer, default_value=None):
         super(ScalarArgument, self).__init__(name, provider, default_value)
         self.reducer = reducer
+        self.frozen = False
 
     @property
     def decl(self):
@@ -78,12 +79,19 @@ class ScalarArgument(Argument):
     def dtype(self):
         return np.int32
 
-    def verify(self, value):
+    def verify(self, value, enforce=False):
+
         if value is not None:
-            if self._value is not None:
-                self._value = self.reducer(self._value, value)
-            else:
+            assert(value is not None or not enforce)
+            if self.value is None:
                 self._value = value
+            else:
+                if enforce:
+                    self._value = value
+                    self.frozen = True
+                else:
+                    if not self.frozen:
+                        self._value = self.reducer(self._value, value)
         return self._value is not None
 
 
@@ -185,8 +193,6 @@ class FixedDimensionArgProvider(ArgumentProvider):
 
         if value is None:
             return True
-        
-        print("(%s) Value passed: %s, my size: %s" % (self.name, str(value), str(self.size)))
         return (value >= self.size)
 
     @property
@@ -246,9 +252,9 @@ class DimensionArgProvider(ArgumentProvider):
         return value
 
     # TODO: Can we do without a verify on a dimension?
-    def verify(self, value):
+    def verify(self, value, enforce=False):
         verify = True
-        print("(%s) Value passed: %s, old value: %s" % (self.name, str(value), str(self.value)))
+    
         if value is None:
             if self.value is not None:
                 return True
@@ -268,12 +274,10 @@ class DimensionArgProvider(ArgumentProvider):
 
         try:
             parent_val = self.parent.value
-            if parent_val is not None:
+            if parent_val is not None and not enforce:
                 parent_val = self.promote(parent_val)
-                print(value)
-                print(parent_val)
                 value = tuple([self.reducer(i1, i2) for i1, i2 in zip(value, parent_val)])
-            verify = verify and self.parent.verify(value)
+            verify = verify and self.parent.verify(value, enforce=enforce)
         except AttributeError:
             pass
         
@@ -281,8 +285,8 @@ class DimensionArgProvider(ArgumentProvider):
         # At this point, a constraint needs to be added that enforces
         # dim_e - dim_s < SOME_MAX
         # Also need a default constraint that dim_e > dim_s (or vice-versa)
-        verify = verify and all([a.verify(v) for a, v in zip(self.rtargs, value)])
-        print("(%s) new value: %s" % (self.name, self.value))
+        verify = verify and all([a.verify(v, enforce) for a, v in zip(self.rtargs, value)])
+
         return verify
 
 class SymbolicDataArgProvider(ArgumentProvider):

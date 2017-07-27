@@ -10,6 +10,7 @@ from devito.compiler import compiler_registry
 from devito.logger import warning
 from seismic.acoustic.acoustic_example import run as acoustic_run
 from seismic.tti.tti_example3D import run as tti_run
+from checkpointing.example import run as cp_run
 
 if __name__ == "__main__":
     description = ("Benchmarking script for TTI example.\n\n" +
@@ -36,7 +37,7 @@ if __name__ == "__main__":
     parser.add_argument("--arch", default="unknown",
                         help="Architecture on which the simulation is/was run.")
     parser.add_argument("-P", "--problem", nargs="?", default="tti",
-                        choices=["acoustic", "tti"], help="Problem")
+                        choices=["acoustic", "tti", "checkpoint"], help="Problem")
     simulation = parser.add_argument_group("Simulation")
     simulation.add_argument("-o", "--omp", action="store_true",
                             help="Enable OpenMP")
@@ -84,11 +85,8 @@ if __name__ == "__main__":
                           help="Annotate points with runtime values")
 
     args = parser.parse_args()
-
-    if args.problem == "tti":
-        run = tti_run
-    else:
-        run = acoustic_run
+    problems = {"acoustic": acoustic_run, "tti": tti_run, "checkpoint": cp_run}
+    run = problems[args.problem]
 
     parameters = vars(args).copy()
     del parameters["execmode"]

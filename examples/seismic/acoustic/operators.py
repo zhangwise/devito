@@ -105,7 +105,7 @@ def AdjointOperator(model, source, receiver, time_order=2, space_order=4, **kwar
                     time_axis=Backward, name='Adjoint', **kwargs)
 
 
-def GradientOperator(model, source, receiver, time_order=2, space_order=4, **kwargs):
+def GradientOperator(model, source, receiver, time_order=2, space_order=4, save=True, **kwargs):
     """
     Constructor method for the gradient operator in an acoustic media
 
@@ -120,7 +120,7 @@ def GradientOperator(model, source, receiver, time_order=2, space_order=4, **kwa
     # Gradient symbol and wavefield symbols
     grad = DenseData(name='grad', shape=model.shape_domain,
                      dtype=model.dtype)
-    u = TimeData(name='u', shape=model.shape_domain, save=True,
+    u = TimeData(name='u', shape=model.shape_domain, save=save,
                  time_dim=source.nt, time_order=time_order,
                  space_order=space_order, dtype=model.dtype)
     v = TimeData(name='v', shape=model.shape_domain, save=False,

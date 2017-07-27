@@ -17,7 +17,12 @@ def test_acousticJ(dimensions, space_order):
 
     # Compute the full wavefield
     _, u0, _ = solver.forward(save=True, m=m0)
-
+    print(u0.data)
+    print(np.linalg.norm(u0.data))
+    u0.data[:] = 0
+    _, u0, _ = solver.forward(save=True, m=m0, time_s=10, time_e=20)
+    print(np.linalg.norm(u0.data))
+    return
     du, _, _, _ = solver.born(dm, m=m0)
     im, _ = solver.gradient(du, u0, m=m0)
 
