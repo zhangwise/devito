@@ -4,7 +4,7 @@ from numpy import linalg
 from devito import TimeData, DenseData
 from examples.seismic import Model, PointSource, Receiver
 from examples.seismic.acoustic import ForwardOperator, GradientOperator
-from checkpoint import DevitoCheckpoint
+from examples.checkpointing.checkpoint import DevitoCheckpoint
 from pyrevolve import Revolver
 
 
