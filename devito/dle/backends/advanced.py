@@ -162,9 +162,10 @@ class DevitoRewriter(BasicRewriter):
                     # Build Iteration over blocks
                     dim = blocked.setdefault(i, Dimension("%s_block" % i.dim.name))
                     block_size = dim.symbolic_size
-                    iter_size = i.dim.size or i.dim.symbolic_size
-                    start = i.limits[0] - i.offsets[0]
+                    iter_size = i.dim.symbolic_size
+
                     finish = iter_size - i.offsets[1]
+                    start = i.limits[0] - i.offsets[0]
                     finish = finish - ((finish - i.offsets[1]) % block_size)
                     inter_block = Iteration([], dim, [start, finish, block_size],
                                             properties=PARALLEL)

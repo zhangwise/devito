@@ -296,11 +296,10 @@ class Iteration(Node):
             self.limits = list((0, limits, 1))
 
         # Replace open limits with variables names
-        if self.limits[1] is None:
-            # FIXME: Add dimension size as variable bound.
-            # Needs further generalisation to support loop blocking.
-            dim = self.dim.parent if self.dim.is_Buffered else self.dim
-            self.limits[1] = dim.size or dim.symbolic_size
+        dim = self.dim.parent if self.dim.is_Buffered else self.dim
+        # FIXME: Add dimension size as variable bound.
+        # Needs further generalisation to support loop blocking.
+        self.limits = [m or d for m, d in zip(self.limits, dim.limits)]
 
         # Record offsets to later adjust loop limits accordingly
         self.offsets = [0, 0]
@@ -474,12 +473,14 @@ class Iteration(Node):
         ``finish``). ``None`` is used as a placeholder in the returned 2-tuple
         if a limit is unknown."""
         try:
-            start = int(self.limits[0]) - self.offsets[0]
+            if start is None:
+                start = int(self.limits[0]) - self.offsets[0]
         except (TypeError, ValueError):
             if not start:
                 start = None
         try:
-            finish = int(self.limits[1]) - self.offsets[1]
+            if finish is None:
+                finish = int(self.limits[1]) - self.offsets[1]
         except (TypeError, ValueError):
             if not finish:
                 finish = None

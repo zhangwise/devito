@@ -1,9 +1,11 @@
+from __future__ import absolute_import
 import weakref
 
 import numpy as np
 from sympy import Function, IndexedBase, Symbol, as_finite_diff, symbols
-from sympy.abc import s
-
+from sympy.abc import h, s
+from functools import reduce
+from operator import mul
 from devito.dimension import t, x, y, z, time
 from devito.finite_difference import (centered, cross_derivative,
                                       first_derivative, left, right,
@@ -614,6 +616,10 @@ class TimeData(DenseData):
         _t = self.indices[0]
 
         return self.subs(_t, _t - i * s)
+
+    @property
+    def size(self):
+        return reduce(mul, self.shape)
 
     @property
     def dt(self):

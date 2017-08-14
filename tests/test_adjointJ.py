@@ -10,14 +10,19 @@ from examples.seismic.acoustic.acoustic_example import setup
 def test_acousticJ(dimensions, space_order):
     solver = setup(dimensions=dimensions,
                    space_order=space_order,
-                   nbpml=10+space_order/2)
+                   nbpml=10+space_order/2, dle='noop', dse='noop')
     initial_vp = np.ones(solver.model.shape_domain) + .5
     m0 = np.float32(initial_vp**-2)
     dm = np.float32(solver.model.m.data - m0)
 
     # Compute the full wavefield
     _, u0, _ = solver.forward(save=True, m=m0)
-
+    print(u0.data)
+    print(np.linalg.norm(u0.data))
+    u0.data[:] = 0
+    _, u0, _ = solver.forward(save=True, m=m0, time_s=10, time_e=20)
+    print(np.linalg.norm(u0.data))
+    return
     du, _, _, _ = solver.born(dm, m=m0)
     im, _ = solver.gradient(du, u0, m=m0)
 

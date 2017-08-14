@@ -23,7 +23,7 @@ from devito.tools import as_tuple, filter_ordered, flatten
 from devito.visitors import (FindSymbols, FindScopes, ResolveIterationVariable,
                              SubstituteExpression, Transformer, NestedTransformer)
 from devito.exceptions import InvalidArgument, InvalidOperator
-from devito.arguments import ScalarArgument, log_args, ArgumentProvider
+from devito.arguments import ArgumentProvider, ScalarArgument, log_args
 
 
 class Operator(Function):
@@ -98,7 +98,7 @@ class Operator(Function):
         parameters = FindSymbols('kernel-data').visit(nodes)
         dimensions = FindSymbols('dimensions').visit(nodes)
         dimensions += [d.parent for d in dimensions if d.is_Buffered]
-        parameters += filter_ordered([d for d in dimensions if d.size is None],
+        parameters += filter_ordered([d for d in dimensions if not d.is_Fixed],
                                      key=operator.attrgetter('name'))
 
         # Resolve and substitute dimensions for loop index variables
@@ -147,12 +147,13 @@ class Operator(Function):
         """ Process any apply-time arguments passed to apply and derive values for
             any remaining arguments
         """
+        print(self.name)
         new_params = {}
         # If we've been passed CompositeData objects as kwargs, they might have children
         # that need to be substituted as well.
         for k, v in kwargs.items():
             if isinstance(v, CompositeData):
-                orig_param_l = [i for i in self.symbolic_data if i.name == k]
+                orig_param_l = [i for i in self.symbolic_data if i.name == k] # Use filter
                 # If I have been passed a parameter, I must have seen it before
                 if len(orig_param_l) == 0:
                     raise InvalidArgument("Parameter %s does not exist in expressions " +
@@ -170,12 +171,13 @@ class Operator(Function):
             assert(ta.verify(kwargs.pop(ta.name, None)))
 
         for d in self.dims:
-            d.verify(kwargs.pop(d.name, None))
+            d.verify(kwargs.pop(d.name, None), enforce=True)
 
         for s in self.scalar_args:
-            s.verify(kwargs.pop(s.name, None))
+            s.verify(kwargs.pop(s.name, None), enforce=True)
 
         dim_sizes = OrderedDict([(d.name, d.value) for d in self.dims])
+
         dim_names = OrderedDict([(d.name, d) for d in self.dims])
         dle_arguments, autotune = self._dle_arguments(dim_sizes)
         dim_sizes.update(dle_arguments)
@@ -188,6 +190,9 @@ class Operator(Function):
 
         for d, v in dim_sizes.items():
             assert(dim_names[d].verify(v))
+
+        for p in self.parameters:
+            assert(p.verify(None))
 
         arguments = self._default_args()
 
@@ -212,11 +217,13 @@ class Operator(Function):
         dle_arguments = OrderedDict()
         autotune = True
         for i in self.dle_arguments:
-            dim_size = dim_sizes.get(i.original_dim.name, i.original_dim.size)
+            dim_size = dim_sizes.get(i.original_dim.name, i.original_dim.value)
             if dim_size is None:
                 error('Unable to derive size of dimension %s from defaults. '
                       'Please provide an explicit value.' % i.original_dim.name)
                 raise InvalidArgument('Unknown dimension size')
+            if isinstance(dim_size, tuple) and len(dim_size) == 2:
+                dim_size = dim_size[1] - dim_size[0]
             if i.value:
                 try:
                     dle_arguments[i.argument.name] = i.value(dim_size)
@@ -265,8 +272,11 @@ class Operator(Function):
         """
         if self._lib is None:
             # No need to recompile if a shared object has already been loaded.
-            return jit_compile(self.ccode, configuration['compiler'])
+            name = jit_compile(self.ccode, configuration['compiler'])
+            print(self.name+":"+name)
+            return name
         else:
+            print(self.name+":"+self._lib.name)
             return self._lib.name
 
     @property
@@ -328,7 +338,7 @@ class Operator(Function):
                 needed = entries[index:]
 
                 # Build and insert the required Iterations
-                iters = [Iteration([], j.dim, j.dim.size, offsets=j.ofs) for j in needed]
+                iters = [Iteration([], j.dim, j.dim.limits, offsets=j.ofs) for j in needed]
                 body, tree = compose_nodes(iters + [expressions], retrieve=True)
                 scheduling = OrderedDict(zip(needed, tree))
                 if root is None:
