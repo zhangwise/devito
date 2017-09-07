@@ -10,6 +10,7 @@ dependencies:
   - flake8>=2.1.0
   - cached-property
   - psutil>=5.1.0
+  - click
   - sphinx
   - sphinx_rtd_theme
   - pip:

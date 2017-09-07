@@ -1,5 +1,5 @@
 import numpy as np
-from argparse import ArgumentParser
+import click
 
 from devito.logger import info
 from examples.seismic.acoustic import AcousticWaveSolver
@@ -50,8 +50,56 @@ def acoustic_setup(dimensions=(50, 50, 50), spacing=(15.0, 15.0, 15.0),
     return solver
 
 
-def run(dimensions=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=1000.0,
-        time_order=2, space_order=4, nbpml=40, full_run=False, **kwargs):
+def acoustic_run(dimensions=(50, 50, 50), spacing=(20.0, 20.0, 20.0),
+                 tn=1000.0, time_order=2, space_order=4, nbpml=40, **kwargs):
+    """ Wrapper method to execute a baseline forward operator """
+    solver = acoustic_setup(dimensions=dimensions, spacing=spacing,
+                            nbpml=nbpml, tn=tn, space_order=space_order,
+                            time_order=time_order, **kwargs)
+
+    info('Applying Forward with time order %d, space order %d' %
+         (time_order, space_order))
+    rec, u, summary = solver.forward(save=False)
+    return summary.gflopss, summary.oi, summary.timings, [rec, u.data]
+
+
+@click.group()
+def example():
+    """Example script for a set of acoustic operators."""
+    pass
+
+
+@example.command()
+@click.option('--dimensions', default=(50, 50, 50),
+              help='Number of grid points in each dimension')
+@click.option('--spacing', default=(20.0, 20.0, 20.0),
+              help='Grid spacing between each point in m')
+@click.option('-tn', default=1000.0, type=float,
+              help='Simulation time in ms')
+@click.option('-to', '--time-order', type=int, default=2,
+              help='Order of time discretization')
+@click.option('-so', '--space-order', type=int, default=4,
+              help='Order of space discretization')
+@click.option('--nbpml', default=40, type=int,
+              help='Number of PML layers')
+def run(dimensions, spacing, tn, time_order, space_order, nbpml):
+    acoustic_run(dimensions=dimensions, spacing=spacing, tn=tn,
+                 time_order=time_order, space_order=space_order, nbpml=nbpml)
+
+
+@example.command()
+@click.option('--dimensions', default=(50, 50, 50),
+              help='Number of grid points in each dimension')
+@click.option('--spacing', default=(20.0, 20.0, 20.0),
+              help='Grid spacing between each point in m')
+@click.option('--tn', default=1000.0, type=float,
+              help='Simulation time in ms')
+@click.option('-to', '--time-order', type=int, default=2,
+              help='Order of time discretization')
+@click.option('-so', '--space-order', type=int, default=4,
+              help='Order of space discretization')
+@click.option('--nbpml', default=40, type=int, help='Number of PML layers')
+def full(dimensions, spacing, tn, time_order, space_order, nbpml, **kwargs):
 
     solver = acoustic_setup(dimensions=dimensions, spacing=spacing,
                             nbpml=nbpml, tn=tn, space_order=space_order,
@@ -60,10 +108,7 @@ def run(dimensions=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=1000.0,
     initial_vp = smooth10(solver.model.m.data, solver.model.shape_domain)
     dm = np.float32(initial_vp**2 - solver.model.m.data)
     info("Applying Forward")
-    rec, u, summary = solver.forward(save=full_run)
-
-    if not full_run:
-        return summary.gflopss, summary.oi, summary.timings, [rec, u.data]
+    rec, u, summary = solver.forward(save=True)
 
     info("Applying Adjoint")
     solver.adjoint(rec, **kwargs)
@@ -74,20 +119,4 @@ def run(dimensions=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=1000.0,
 
 
 if __name__ == "__main__":
-    description = ("Example script for a set of acoustic operators.")
-    parser = ArgumentParser(description=description)
-    parser.add_argument('-f', '--full', default=False, action='store_true',
-                        help="Execute all operators and store forward wavefield")
-    parser.add_argument('-a', '--autotune', default=False, action='store_true',
-                        help="Enable autotuning for block sizes")
-    parser.add_argument("-to", "--time_order", default=2,
-                        type=int, help="Time order of the simulation")
-    parser.add_argument("-so", "--space_order", default=6,
-                        type=int, help="Space order of the simulation")
-    parser.add_argument("--nbpml", default=40,
-                        type=int, help="Number of PML layers around the domain")
-    args = parser.parse_args()
-
-    run(full_run=args.full, autotune=args.autotune,
-        space_order=args.space_order, time_order=args.time_order,
-        nbpml=args.nbpml)
+    example()
