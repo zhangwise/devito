@@ -98,7 +98,8 @@ def run(dimensions, spacing, tn, time_order, space_order, nbpml):
               help='Order of time discretization')
 @click.option('-so', '--space-order', type=int, default=4,
               help='Order of space discretization')
-@click.option('--nbpml', default=40, type=int, help='Number of PML layers')
+@click.option('--nbpml', default=40, type=int,
+              help='Number of PML layers')
 def full(dimensions, spacing, tn, time_order, space_order, nbpml, **kwargs):
 
     solver = acoustic_setup(dimensions=dimensions, spacing=spacing,
@@ -116,6 +117,74 @@ def full(dimensions, spacing, tn, time_order, space_order, nbpml, **kwargs):
     solver.born(dm, **kwargs)
     info("Applying Gradient")
     solver.gradient(rec, u, **kwargs)
+
+
+@example.command()
+@click.option('-d', '--dim', type=int, default=2,
+              help='Number of spatial dimensions: 2D or 3D')
+@click.option('--tn', default=300.0, type=float,
+              help='Simulation time in ms')
+@click.option('--ref-shape', type=int, default=1680,
+              help='Grid size of the reference solution')
+@click.option('--ref-order', type=int, default=40,
+              help='Spatial order of the reference solution')
+@click.option('-s', '--scale', type=int, default=(1, ), multiple=True,
+              help='Factor by which to scale the reference spacing/shape')
+@click.option('-o', '--order', type=int, default=(2, ), multiple=True,
+              help='Spatial discretization order to run experiment')
+def convergence(dim, tn, ref_shape, ref_order, scale, order):
+    """ Convergence test for an acoustic forward operator """
+
+    # Reference run at with constant velocity and 1km grid in each dimension
+    shape = tuple(ref_shape for _ in range(dim))
+    spacing = tuple(1000. / i for i in shape)
+    model = demo_model('layers', vp_top=1.5, vp_bottom=1.5,
+                       shape=shape, spacing=spacing, nbpml=0)
+
+    # Derive timestepping from model spacing
+    t0 = 0.0
+    nt = int(1 + (tn-t0) / model.critical_dt)  # Number of timesteps
+    time = np.linspace(t0, tn, nt)  # Discretized time axis
+    tidx = (nt + 2) % 3  # Final time index in wavefield buffer
+
+    # Define source in center of domain
+    src = RickerSource(name='src', ndim=model.dim, f0=0.01, time=time)
+    src.coordinates.data[0, :] = np.array(model.domain_size) * .5
+
+    # Define receivers in center of domain, but spread across x
+    nrec = 20
+    rec = Receiver(name='rec', ntime=nt, npoint=nrec, ndim=model.dim)
+    rec.coordinates.data[:, 0] = np.linspace(0., model.domain_size[0], num=nrec)
+    rec.coordinates.data[:, 1:] = src.coordinates.data[0, 1:]
+
+    # Run reference model and store final wavefield
+    info("Running reference solution with shape %s order %d" %
+         (shape, ref_order))
+    _, u_r, _ = AcousticWaveSolver(model, source=src, receiver=rec,
+                                   space_order=ref_order).forward(save=False)
+    u_ref = u_r.data[tidx].copy()
+
+    for o in order:
+        for s in scale:
+            info("Running experiement with order %d, scale %d" % (o, s))
+
+            # Create model for experiment
+            shape = tuple(ref_shape / s for _ in range(dim))
+            spacing = tuple(1000. / i for i in shape)
+            m0 = demo_model('layers', vp_top=1.5, vp_bottom=1.5,
+                            shape=shape, spacing=spacing, nbpml=0)
+
+            # Run experiment with specified grid scaling and order
+            u = AcousticWaveSolver(m0, source=src, receiver=rec,
+                                   space_order=o).forward(save=False)[1]
+            u0 = u.data[tidx]
+
+            # Compute and log resulting error with respect to reference
+            error = np.linalg.norm(
+                u_ref.reshape(-1) / np.linalg.norm(u_ref.reshape(-1))
+                - u0.reshape(-1) / np.linalg.norm(u0.reshape(-1))
+            )
+            info("Error[O::%d, S::%d] %f" % (o, s, error))
 
 
 if __name__ == "__main__":
