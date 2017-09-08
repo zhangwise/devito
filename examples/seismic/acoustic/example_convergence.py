@@ -1,9 +1,15 @@
 import numpy as np
 import click
 
-from devito.logger import info
+from devito import info, error, clear_cache
 from examples.seismic.acoustic import AcousticWaveSolver
 from examples.seismic import demo_model, RickerSource, Receiver
+try:
+    from opescibench import Executor, Benchmark
+except:
+    error('Could not find the Opesci benchmarking utility.\n'
+          'Please install this from https://github.com/opesci/opescibench')
+    raise ImportError('Missing opescibench utility package')
 
 
 @click.group()
@@ -30,8 +36,8 @@ def example():
               help='Factor by which to scale the reference spacing/shape')
 @click.option('-o', '--order', type=int, default=(2, ), multiple=True,
               help='Spatial discretization order to run experiment')
-def convergence(dim, tn, ref_shape, ref_order, ref_data, scale, order):
-    """ Convergence test for an acoustic forward operator """
+def bench(dim, tn, ref_shape, ref_order, ref_data, scale, order):
+    """ Convergence benchmark for an acoustic forward operator """
 
     # Reference run at with constant velocity and 1km grid in each dimension
     shape = tuple(ref_shape for _ in range(dim))
@@ -75,28 +81,46 @@ def convergence(dim, tn, ref_shape, ref_order, ref_data, scale, order):
         u_ref = np.load('%s.npy' % fname)
         u_ref.reshape(shape)
 
-    # Perform benchmarks across parameter sets
-    for o in order:
-        for s in scale:
-            info("Running experiement with order %d, scale %d" % (o, s))
+    parameters = {
+        'dim': dim, 'tn': tn, 'scale': list(scale), 'order': list(order),
+        'ref_shape': ref_shape, 'ref_order': ref_order,
+    }
+
+    class AcousticForward(Executor):
+        """Executor for an acoustic forward operator"""
+
+        def run(self, dim, tn, scale, order, ref_shape, **kwargs):
+            # from IPython import embed; embed()
 
             # Create model for experiment
-            shape = tuple(ref_shape / s for _ in range(dim))
+            shape = tuple(ref_shape / scale for _ in range(dim))
             spacing = tuple(1000. / i for i in shape)
             m0 = demo_model('layers', vp_top=1.5, vp_bottom=1.5,
                             shape=shape, spacing=spacing, nbpml=0)
 
             # Run experiment with specified grid scaling and order
-            u = AcousticWaveSolver(m0, source=src, receiver=rec,
-                                   space_order=o).forward(save=False)[1]
+            solver = AcousticWaveSolver(m0, source=src, receiver=rec,
+                                        space_order=order)
+            _, u, timings = solver.forward(save=False)
             u0 = u.data[tidx]
 
             # Compute and log resulting error with respect to reference
+            u_r = u_ref[::scale, ::scale]
             error = np.linalg.norm(
-                u_ref.reshape(-1) / np.linalg.norm(u_ref.reshape(-1))
-                - u0.reshape(-1) / np.linalg.norm(u0.reshape(-1))
+                u0.reshape(-1) / np.linalg.norm(u0.reshape(-1))
+                - u_r.reshape(-1) / np.linalg.norm(u_r.reshape(-1))
             )
-            info("Error[O::%d, S::%d] %s" % (o, s, error))
+            info("Error[order: %d, scale: %d] %s" % (order, scale, error))
+
+            # Register timings and error measurements
+            self.register(timings['main'].time, measure='time')
+            self.register(error, measure='error')
+
+            clear_cache()
+
+    benchmark = Benchmark(name='acoustic', parameters=parameters)
+    benchmark.execute(AcousticForward(), warmups=0, repeats=3)
+    benchmark.save()
 
 
 if __name__ == "__main__":
