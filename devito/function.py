@@ -126,14 +126,14 @@ class Function(TensorFunction):
             self.grid = kwargs.get('grid', None)
 
             if self.grid is None:
-                self.shape_domain = kwargs.get('shape', None)
+                self._shape_domain = kwargs.get('shape', None)
                 self.dtype = kwargs.get('dtype', np.float32)
-                if self.shape_domain is None:
+                if self._shape_domain is None:
                     error("Creating a Function requires either 'shape'"
                           "or a 'grid' argument")
                     raise ValueError("Unknown symbol dimensions or shape")
             else:
-                self.shape_domain = self.grid.shape_domain
+                self._shape_domain = self.grid.shape_domain
                 self.dtype = kwargs.get('dtype', self.grid.dtype)
             self.indices = self._indices(**kwargs)
 
@@ -146,7 +146,6 @@ class Function(TensorFunction):
 
             # Dynamically add derivative short-cuts
             self._initialize_derivatives()
-
 
     def _initialize_derivatives(self):
         """
@@ -241,15 +240,37 @@ class Function(TensorFunction):
         return dimensions
 
     @property
-    def shape_data(self):
-        """
-        Full allocated shape of the data associated with this :class:`Function`.
-        """
-        return self.shape_domain
-
-    @property
     def shape(self):
         return self.shape_data
+
+    @property
+    def shape_allocated(self):
+        """
+        Allocated raw shape of the data associated with this :class:`Function`.
+
+        .. note::
+
+           This shape might be different from ``shape_data`` if Devito or
+           one of its backends decide to add extra padding that should be
+           invisible to the user.
+        """
+        return self.shape_data
+
+    @property
+    def shape_data(self):
+        """
+        Shape of the domain associated with this :class:`Function`.
+        The domain constitutes the aread of the data written to in a
+        stencil update and excludes the read-only stencil boundary.
+        """
+        return tuple(np.array(self.shape_domain) + self.space_order)
+
+    @property
+    def shape_domain(self):
+        """
+        Full shape of the data associated with this :class:`Function`.
+        """
+        return self._shape_domain
 
     @property
     def space_dimensions(self):
@@ -259,7 +280,7 @@ class Function(TensorFunction):
     def _allocate_memory(self):
         """Allocate memory in terms of numpy ndarrays."""
         debug("Allocating memory for %s (%s)" % (self.name, str(self.shape)))
-        self._data_object = CMemory(self.shape, dtype=self.dtype)
+        self._data_object = CMemory(self.shape_allocated, dtype=self.dtype)
         if self._first_touch:
             first_touch(self)
         else:
@@ -371,7 +392,7 @@ class TimeFunction(Function):
         Full allocated shape of the data associated with this :class:`TimeFunction`.
         """
         tsize = self.time_dim if self.save else self.time_order + 1
-        return (tsize, ) + self.shape_domain
+        return (tsize, ) + super(TimeFunction, self).shape_data
 
     def initialize(self):
         if self.initializer is not None:
@@ -472,12 +493,14 @@ class SparseFunction(CompositeFunction):
             self.npoint = kwargs.get('npoint')
             self.ndim = kwargs.get('ndim')
             kwargs['shape'] = (self.nt, self.npoint)
+            kwargs['space_order'] = 0
             super(SparseFunction, self).__init__(self, *args, **kwargs)
 
             # Allocate and copy coordinate data
             self.coordinates = Function(name='%s_coords' % self.name,
                                         dimensions=[self.indices[1], d],
-                                        shape=(self.npoint, self.ndim))
+                                        shape=(self.npoint, self.ndim),
+                                        space_order=0)
             self._children.append(self.coordinates)
             coordinates = kwargs.get('coordinates', None)
             if coordinates is not None:
