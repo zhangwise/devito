@@ -220,5 +220,5 @@ def second_cross_derivative(function, dims, order):
     :param dims: Dimensions for which to take the derivative.
     :param order: Discretisation order of the stencil to create.
     """
-    first = second_derivative(function, dim=dims[0], width=order)
+    first = second_derivative(function, dim=dims[0], order=order)
     return second_derivative(first, dim=dims[1], order=order)
