@@ -35,8 +35,8 @@ def test_acoustic(mkey, shape, time_order, space_order, nbpml):
     nrec = 130  # Number of receivers
 
     # Create model from preset
-    model = demo_model(spacing=[15. for _ in shape],
-                       shape=shape, nbpml=nbpml, **(presets[mkey]))
+    model = demo_model(spacing=[15. for _ in shape], shape=shape,
+                       nbpml=nbpml, padding=space_order, **(presets[mkey]))
 
     # Derive timestepping from model spacing
     dt = model.critical_dt * (1.73 if time_order == 4 else 1.0)

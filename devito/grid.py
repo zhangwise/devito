@@ -19,6 +19,11 @@ class Grid(object):
                    defaults to 0. in all dimensions.
     :param dtype: Default data type to be inherited by all Functions
                   created from this :class:`Grid`.
+    :param padding: (Optional) width of the outer padding layer that
+                    is inherited by all :class:`Function` objects
+                    derived from this :class:`Grid`. This can be used
+                    to ensure data alignment for :class:`Function
+                    objects with different ``space_order`` parameters.
 
     The :class:`Grid` encapsulates the topology and geometry
     information of the computational domain that :class:`Function`
@@ -49,11 +54,12 @@ class Grid(object):
     """
 
     def __init__(self, shape, extent=None, origin=None, dimensions=None,
-                 dtype=np.float32):
+                 dtype=np.float32, padding=None):
         self.shape = as_tuple(shape)
         self.extent = as_tuple(extent or tuple(1. for _ in shape))
         self.origin = as_tuple(origin or tuple(0. for _ in shape))
         self.dtype = dtype
+        self.padding = padding
 
         # TODO: Raise proper exceptions and logging
         assert(self.dim == len(self.origin) == len(self.extent) == len(self.spacing))

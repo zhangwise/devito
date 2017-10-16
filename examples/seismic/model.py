@@ -294,6 +294,11 @@ class Model(object):
     :param delta: Thomsen delta parameter (0<delta<1), delta<epsilon
     :param theta: Tilt angle in radian
     :param phi: Asymuth angle in radian
+    :param padding: (Optional) width of the outer padding layer
+                    that is inherited by all :class:`Function` objects
+                    derived from this :class:`Grid`. Useful for ensuring
+                    data alignment when using :class:`Function objects
+                    with different ``space_order`` parameters.
 
     The :class:`Model` provides two symbolic data objects for the
     creation of seismic wave propagation operators:
@@ -302,15 +307,16 @@ class Model(object):
     :param damp: The damping field for absorbing boundarycondition
     """
     def __init__(self, origin, spacing, shape, vp, nbpml=20, dtype=np.float32,
-                 epsilon=None, delta=None, theta=None, phi=None):
+                 padding=None, epsilon=None, delta=None, theta=None, phi=None):
         self.shape = shape
         self.nbpml = int(nbpml)
+        self.padding = padding
 
         shape_pml = np.array(shape) + 2 * self.nbpml
         # Physical extent is calculated per cell, so shape - 1
         extent = tuple(np.array(spacing) * (shape_pml - 1))
         self.grid = Grid(extent=extent, shape=shape_pml,
-                         origin=origin, dtype=dtype)
+                         origin=origin, dtype=dtype, padding=padding)
 
         # Create square slowness of the wave as symbol `m`
         if isinstance(vp, np.ndarray):
@@ -445,9 +451,11 @@ class Model(object):
             self.m.data = 1 / vp**2
 
     def pad(self, data):
-        """Padding function PNL layers in every direction for for the
+        """Padding function PML layers in every direction for for the
         absorbing boundary conditions.
 
         :param data : Data array to be padded"""
-        pad_list = [(self.nbpml, self.nbpml) for _ in self.shape]
+        padding = 0 if self.padding is None else int(self.padding / 2)
+        pad_list = [(self.nbpml + padding, self.nbpml + padding)
+                    for _ in self.shape]
         return np.pad(data, pad_list, 'edge')

@@ -263,7 +263,11 @@ class Function(TensorFunction):
         The domain constitutes the aread of the data written to in a
         stencil update and excludes the read-only stencil boundary.
         """
-        return tuple(np.array(self.shape_domain) + self.space_order)
+        if self.grid is None:
+            return tuple(np.array(self.shape_domain) + self.space_order)
+        else:
+            padding = self.grid.padding or self.space_order
+            return tuple(np.array(self.shape_domain) + padding)
 
     @property
     def shape_domain(self):
