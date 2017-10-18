@@ -9,7 +9,7 @@ from devito import Grid, Operator, Function, SparseFunction, x, y, z
 @pytest.fixture
 def a(shape=(11, 11)):
     grid = Grid(shape=shape)
-    a = Function(name='a', grid=grid)
+    a = Function(name='a', grid=grid, space_order=0)
     xarr = np.linspace(0., 1., shape[0])
     yarr = np.linspace(0., 1., shape[1])
     a.data[:] = np.meshgrid(xarr, yarr)[1]
@@ -19,7 +19,7 @@ def a(shape=(11, 11)):
 def unit_box(name='a', shape=(11, 11)):
     """Create a field with value 0. to 1. in each dimension"""
     grid = Grid(shape=shape)
-    a = Function(name=name, grid=grid)
+    a = Function(name=name, grid=grid, space_order=0)
     dims = tuple([np.linspace(0., 1., d) for d in shape])
     a.data[:] = np.meshgrid(*dims)[1]
     return a
@@ -92,7 +92,7 @@ def test_inject_from_field(shape, coords, result, npoints=19):
     a = unit_box(shape=shape)
     spacing = a.data[tuple([1 for _ in shape])]
     a.data[:] = 0.
-    b = Function(name='b', grid=a.grid)
+    b = Function(name='b', grid=a.grid, space_order=0)
     b.data[:] = 1.
     p = points(ranges=coords, npoints=npoints)
 
