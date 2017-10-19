@@ -36,7 +36,7 @@ def test_stencil_derivative(grid, shape, SymbolType, dimension):
     u_dx = s_dx.args[0].args[1]
     u_dxx = s_dx.args[0].args[1]
     # Ensure that devito meta-data survived symbolic transformation
-    assert(u_dx.shape[-2:] == shape and u_dxx.shape[-2:] == shape)
+    assert(u_dx.shape == u.shape and u_dxx.shape == u.shape)
     assert(np.allclose(u_dx.data, 66.6))
     assert(np.allclose(u_dxx.data, 66.6))
 

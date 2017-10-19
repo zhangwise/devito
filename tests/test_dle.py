@@ -104,7 +104,8 @@ def complex_function(a, b, c, d, exprs, iters):
 def _new_operator1(shape, **kwargs):
     grid = Grid(shape=shape, dtype=np.int32)
     infield = Function(name='infield', grid=grid)
-    infield.data[:] = np.arange(reduce(mul, shape), dtype=np.int32).reshape(shape)
+    infield.data[:] = np.arange(reduce(mul, infield.shape),
+                                dtype=np.int32).reshape(infield.shape)
 
     outfield = Function(name='outfield', grid=grid)
 
@@ -120,7 +121,8 @@ def _new_operator1(shape, **kwargs):
 def _new_operator2(shape, time_order, **kwargs):
     grid = Grid(shape=shape, dtype=np.int32)
     infield = TimeFunction(name='infield', grid=grid, time_order=time_order)
-    infield.data[:] = np.arange(reduce(mul, shape), dtype=np.int32).reshape(shape)
+    infield.data[:] = np.arange(reduce(mul, infield.shape),
+                                dtype=np.int32).reshape(infield.shape)
 
     outfield = TimeFunction(name='outfield', grid=grid, time_order=time_order)
 
@@ -145,7 +147,8 @@ def _new_operator3(shape, time_order, **kwargs):
     # Allocate the grid and set initial condition
     # Note: This should be made simpler through the use of defaults
     u = TimeFunction(name='u', grid=grid, time_order=1, space_order=2)
-    u.data[0, :] = np.arange(reduce(mul, shape), dtype=np.int32).reshape(shape)
+    u.data[0, :] = np.arange(reduce(mul, u.shape[1:]),
+                             dtype=np.int32).reshape(u.shape[1:])
 
     # Derive the stencil according to devito conventions
     eqn = Eq(u.dt, a * (u.dx2 + u.dy2) - c * (u.dxl + u.dyl))
