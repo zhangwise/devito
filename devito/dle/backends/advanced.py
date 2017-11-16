@@ -306,11 +306,7 @@ class DevitoRewriter(BasicRewriter):
                 # physical core count is greater than self.thresholds['collapse'],
                 # then omp-collapse the loops
                 nparallel = len(tree)
-                if psutil.cpu_count(logical=False) < self.thresholds['collapse'] or\
-                        nparallel < 2:
-                    parallel = omplang['for']
-                else:
-                    parallel = omplang['collapse'](nparallel)
+                parallel = omplang['for']
 
                 mapper[root] = root._rebuild(pragmas=root.pragmas + (parallel,))
 
