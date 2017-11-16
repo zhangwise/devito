@@ -32,8 +32,7 @@ class BasicRewriter(AbstractRewriter):
         are normally flushed when using SSE-based instruction sets, except when
         compiling shared objects.
         """
-        return (List(body=(Denormals(), nodes)),
-                {'includes': ('xmmintrin.h', 'pmmintrin.h')})
+        return (nodes, {})
 
     @dle_pass
     def _create_elemental_functions(self, nodes, state):
