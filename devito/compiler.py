@@ -110,6 +110,8 @@ class ClangCompiler(Compiler):
         self.cc = 'clang'
         self.ld = 'clang'
         self.cflags = ['-O3', '-g', '-fPIC', '-Wall', '-std=c99']
+        # Doru's flags
+        self.cflags += ['-I${OMPRTL}/../', '-L${OMPRTL}']
         self.ldflags = ['-shared']
         self.lib_ext = 'dylib'
 
