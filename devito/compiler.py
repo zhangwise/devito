@@ -113,6 +113,9 @@ class ClangCompiler(Compiler):
         self.ldflags = ['-shared']
         self.lib_ext = 'dylib'
 
+        if configuration['openmp']:
+            self.ldflags += ['-fopenmp']
+
 
 class IntelCompiler(Compiler):
     """Set of standard compiler flags for the Intel toolchain
