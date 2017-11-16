@@ -114,7 +114,7 @@ class ClangCompiler(Compiler):
         self.cflags += ['-I${OMPRTL}/../', '-L${OMPRTL}']
         self.ldflags = ['-shared']
         # Doru's linking flags
-        self.ldflags += ['-Wl,-rpath=/home/gbercea//manual-compiler/lomp/lomp/source/lib64']
+        self.ldflags += ['-Wl,-rpath=/home/gbercea//manual-compiler/lomp/lomp/source/lib64', '-lomp']
         self.lib_ext = 'dylib'
 
         if configuration['openmp']:
