@@ -16,6 +16,7 @@ class Dimension(AbstractSymbol):
     is_Derived = False
     is_Stepping = False
     is_Lowered = False
+    is_SubSampled = False
 
     """
     Index object that represents a problem dimension and thus defines a
@@ -126,42 +127,19 @@ class TimeDimension(Dimension):
     :param spacing: Optional, symbol for the spacing along this dimension.
     """
 
-
-class SteppingDimension(Dimension):
-
+class DerivedDimension(Dimension):
     is_Derived = True
-    is_Stepping = True
-
-    """
-    Dimension symbol that defines the stepping direction of an
-    :class:`Operator` and implies modulo buffered iteration. This is most
-    commonly use to represent a timestepping dimension.
-    :param parent: Parent dimension over which to loop in modulo fashion.
-    """
-
+    
     def __new__(cls, name, parent, **kwargs):
         newobj = sympy.Symbol.__new__(cls, name)
         assert isinstance(parent, Dimension)
-        newobj._modulo = kwargs.get('modulo', 2)
-        newobj._parent = parent
+        newobj.parent = parent
+
         # Inherit time/space identifiers
-        newobj.is_Time = parent.is_Time
-        newobj.is_Space = parent.is_Space
+        cls.is_Time = parent.is_Time
+        cls.is_Space = parent.is_Space
+
         return newobj
-
-    @property
-    def parent(self):
-        return self._parent
-
-    @property
-    def modulo(self):
-        return self._modulo
-
-    @modulo.setter
-    def modulo(self, val):
-        # TODO: this is an outrageous hack. TimeFunctions are updating this value
-        # at construction time. This is a symptom we need local and global dimensions
-        self._modulo = val
 
     @property
     def reverse(self):
@@ -170,6 +148,41 @@ class SteppingDimension(Dimension):
     @property
     def spacing(self):
         return self.parent.spacing
+
+    
+class SteppingDimension(DerivedDimension):
+    """
+    Dimension symbol that defines the stepping direction of an
+    :class:`Operator` and implies modulo buffered iteration. This is most
+    commonly use to represent a timestepping dimension.
+    :param parent: Parent dimension over which to loop in modulo fashion.
+    """
+    is_Stepping = True
+    def __new__(cls, name, parent, **kwargs):
+        newobj = sympy.Symbol.__new__(cls, name)
+        newobj.modulo = kwargs.get('modulo', 2)
+        return newobj
+
+
+class SubsampledDimension(Dimension):
+    is_SubSampled = True
+
+    """
+    Dimension symbol that defines an iteration that proceeds with an increment
+    of more than 1.
+    """
+
+    def __new__(cls, name, parent, **kwargs):
+        newobj = sympy.Symbol.__new__(cls, name)
+        assert isinstance(parent, Dimension)
+        newobj.parent = parent
+        newobj.factor = kwargs.get('factor', 4)
+
+        # Inherit time/space identifiers
+        newobj.is_Time = parent.is_Time
+        newobj.is_Space = parent.is_Space
+        return newobj
+    
 
     def _hashable_content(self):
         return (self.parent._hashable_content(), self.modulo)
