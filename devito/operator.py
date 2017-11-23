@@ -101,6 +101,8 @@ class Operator(Callable):
         # Translate into backend-specific representation (e.g., GPU, Yask)
         nodes = self._specialize(nodes, parameters)
 
+        printAST(nodes)
+
         # Apply the Devito Loop Engine (DLE) for loop optimization
         dle_state = transform(nodes, *set_dle_mode(dle))
 
