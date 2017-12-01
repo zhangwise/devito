@@ -11,16 +11,16 @@ from devito.arguments import infer_dimension_values_tuple
 from devito.cgen_utils import Allocator
 from devito.compiler import jit_compile, load
 from devito.dimension import Dimension
-from devito.dle import compose_nodes, filter_iterations, transform
+from devito.dle import transform
 from devito.dse import rewrite
 from devito.exceptions import InvalidArgument, InvalidOperator
 from devito.function import Forward, Backward, CompositeFunction
 from devito.logger import bar, error, info
 from devito.ir.clusters import clusterize
 from devito.ir.iet import (Element, Expression, Callable, Iteration, List,
-                           LocalExpression, FindScopes, ResolveTimeStepping,
+                           LocalExpression, MapExpressions, ResolveTimeStepping,
                            SubstituteExpression, Transformer, NestedTransformer,
-                           analyze_iterations)
+                           analyze_iterations, compose_nodes, filter_iterations)
 from devito.ir.support import Stencil
 from devito.parameters import configuration
 from devito.profiling import create_profile
@@ -83,12 +83,10 @@ class Operator(Callable):
         expressions = [s.xreplace(subs) for s in expressions]
 
         # Analysis
-        self.dtype = self._retrieve_dtype(expressions)
-        self.input, self.output, self.dimensions = self._retrieve_symbols(expressions)
-        stencils = self._retrieve_stencils(expressions)
-
-        # Extract argument offsets
-        self._store_argument_offsets(stencils)
+        self.dtype = retrieve_dtype(expressions)
+        self.input, self.output, self.dimensions = retrieve_symbols(expressions)
+        stencils = make_stencils(expressions)
+        self.offsets = {d.end_name: v for d, v in retrieve_offsets(stencils).items()}
 
         # Set the direction of time acoording to the given TimeAxis
         for time in [d for d in self.dimensions if d.is_Time]:
@@ -98,7 +96,7 @@ class Operator(Callable):
         # Parameters of the Operator (Dimensions necessary for data casts)
         parameters = self.input + self.dimensions
 
-        # Group expressions based on their Stencil
+        # Group expressions based on their Stencil and data dependences
         clusters = clusterize(expressions, stencils)
 
         # Apply the Devito Symbolic Engine (DSE) for symbolic optimization
@@ -171,13 +169,13 @@ class Operator(Callable):
             if user_provided_value is not None:
                 user_provided_value = infer_dimension_values_tuple(user_provided_value,
                                                                    d.rtargs,
-                                                                   self.argument_offsets)
+                                                                   self.offsets)
             d.verify(user_provided_value, enforce=True)
         for i in self.parameters:
             if i.is_ScalarArgument:
                 user_provided_value = kwargs.pop(i.name, None)
                 if user_provided_value is not None:
-                    user_provided_value += self.argument_offsets.get(i.name, 0)
+                    user_provided_value += self.offsets.get(i.name, 0)
                 i.verify(user_provided_value, enforce=True)
         dim_sizes = {}
         for d in self.dimensions:
@@ -209,7 +207,8 @@ class Operator(Callable):
         # Clear the temp values we stored in the arg objects since we've pulled them out
         # into the OrderedDict object above
         self._reset_args()
-        return arguments, dim_sizes
+
+        return arguments
 
     def _default_args(self):
         return OrderedDict([(x.name, x.value) for x in self.parameters])
@@ -244,12 +243,6 @@ class Operator(Callable):
     @property
     def elemental_functions(self):
         return tuple(i.root for i in self.func_table.values())
-
-    def _store_argument_offsets(self, stencils):
-        offs = Stencil.union(*stencils)
-        arg_offs = {d: v for d, v in offs.diameter.items()}
-        arg_offs.update({d.parent: v for d, v in arg_offs.items() if d.is_Stepping})
-        self.argument_offsets = {d.end_name: v for d, v in arg_offs.items()}
 
     @property
     def compile(self):
@@ -306,7 +299,6 @@ class Operator(Callable):
         # Build the Iteration/Expression tree
         processed = []
         schedule = OrderedDict()
-        atomics = ()
         for i in clusters:
             # Build the Expression objects to be inserted within an Iteration tree
             expressions = [Expression(v, np.int32 if i.trace.is_index(k) else self.dtype)
@@ -319,7 +311,7 @@ class Operator(Callable):
                 # Can I reuse any of the previously scheduled Iterations ?
                 index = 0
                 for j0, j1 in zip(entries, list(schedule)):
-                    if j0 != j1 or j0.dim in atomics:
+                    if j0 != j1 or j0.dim in clusters.atomics[i]:
                         break
                     root = schedule[j1]
                     index += 1
@@ -346,9 +338,6 @@ class Operator(Callable):
                 # No Iterations are needed
                 processed.extend(expressions)
 
-            # Track dimensions that cannot be fused at next stage
-            atomics = i.atomics
-
         return List(body=processed)
 
     def _specialize(self, nodes, parameters):
@@ -362,11 +351,12 @@ class Operator(Callable):
 
         # Resolve function calls first
         scopes = []
-        for k, v in FindScopes().visit(nodes).items():
+        me = MapExpressions()
+        for k, v in me.visit(nodes).items():
             if k.is_Call:
                 func = self.func_table[k.name]
                 if func.local:
-                    scopes.extend(FindScopes().visit(func.root, queue=list(v)).items())
+                    scopes.extend(me.visit(func.root, queue=list(v)).items())
             else:
                 scopes.append((k, v))
 
@@ -404,60 +394,6 @@ class Operator(Callable):
 
         return nodes
 
-    def _retrieve_dtype(self, expressions):
-        """
-        Retrieve the data type of a set of expressions. Raise an error if there
-        is no common data type (ie, if at least one expression differs in the
-        data type).
-        """
-        lhss = set([s.lhs.base.function.dtype for s in expressions])
-        if len(lhss) != 1:
-            raise RuntimeError("Expression types mismatch.")
-        return lhss.pop()
-
-    def _retrieve_stencils(self, expressions):
-        """Determine the :class:`Stencil` of each provided expression."""
-        stencils = [Stencil(i) for i in expressions]
-        dimensions = set.union(*[set(i.dimensions) for i in stencils])
-
-        # Filter out aliasing stepping dimensions
-        mapper = {d.parent: d for d in dimensions if d.is_Stepping}
-        for i in list(stencils):
-            for d in i.dimensions:
-                if d in mapper:
-                    i[mapper[d]] = i.pop(d).union(i.get(mapper[d], set()))
-
-        return stencils
-
-    def _retrieve_symbols(self, expressions):
-        """
-        Retrieve the symbolic functions read or written by the Operator,
-        as well as all traversed dimensions.
-        """
-        terms = flatten(retrieve_terminals(i) for i in expressions)
-
-        input = []
-        for i in terms:
-            try:
-                input.append(i.base.function)
-            except AttributeError:
-                pass
-        input = filter_sorted(input, key=attrgetter('name'))
-
-        output = [i.lhs.base.function for i in expressions if i.lhs.is_Indexed]
-
-        indexeds = [i for i in terms if i.is_Indexed]
-        dimensions = []
-        for indexed in indexeds:
-            for i in indexed.indices:
-                dimensions.extend([k for k in i.free_symbols
-                                   if isinstance(k, Dimension)])
-            dimensions.extend(list(indexed.base.function.indices))
-        dimensions.extend([d.parent for d in dimensions if d.is_Stepping])
-        dimensions = filter_sorted(dimensions, key=attrgetter('name'))
-
-        return input, output, dimensions
-
 
 class OperatorRunnable(Operator):
     """
@@ -471,7 +407,7 @@ class OperatorRunnable(Operator):
     def apply(self, **kwargs):
         """Apply the stencil kernel to a set of data objects"""
         # Build the arguments list to invoke the kernel function
-        arguments, dim_sizes = self.arguments(**kwargs)
+        arguments = self.arguments(**kwargs)
 
         # Invoke kernel function with args
         self.cfunction(*list(arguments.values()))
@@ -492,10 +428,80 @@ class OperatorRunnable(Operator):
 
     def _profile_sections(self, nodes, parameters):
         """Introduce C-level profiling nodes within the Iteration/Expression tree."""
-        nodes, profiler = create_profile(nodes)
+        nodes, profiler = create_profile('timers', nodes)
         self._globals.append(profiler.cdef)
-        parameters.append(Object(profiler.varname, profiler.dtype, profiler.setup()))
+        parameters.append(Object(profiler.name, profiler.dtype, profiler.new))
         return nodes, profiler
+
+
+# Functions collecting information from a bag of expressions
+
+def retrieve_dtype(expressions):
+    """
+    Retrieve the data type of a set of expressions. Raise an error if there
+    is no common data type (ie, if at least one expression differs in the
+    data type).
+    """
+    lhss = set([s.lhs.base.function.dtype for s in expressions])
+    if len(lhss) != 1:
+        raise RuntimeError("Expression types mismatch.")
+    return lhss.pop()
+
+
+def retrieve_symbols(expressions):
+    """
+    Return the :class:`Function` and :class:`Dimension` objects appearing
+    in ``expressions``.
+    """
+    terms = flatten(retrieve_terminals(i) for i in expressions)
+
+    input = []
+    for i in terms:
+        try:
+            input.append(i.base.function)
+        except AttributeError:
+            pass
+    input = filter_sorted(input, key=attrgetter('name'))
+
+    output = [i.lhs.base.function for i in expressions if i.lhs.is_Indexed]
+
+    indexeds = [i for i in terms if i.is_Indexed]
+    dimensions = []
+    for indexed in indexeds:
+        for i in indexed.indices:
+            dimensions.extend([k for k in i.free_symbols
+                               if isinstance(k, Dimension)])
+        dimensions.extend(list(indexed.base.function.indices))
+    dimensions.extend([d.parent for d in dimensions if d.is_Stepping])
+    dimensions = filter_sorted(dimensions, key=attrgetter('name'))
+
+    return input, output, dimensions
+
+
+def make_stencils(expressions):
+    """
+    Create a :class:`Stencil` for each of the provided expressions. The following
+    rules apply: ::
+
+        * A :class:`SteppingDimension` ``d`` is replaced by its parent ``d.parent``.
+    """
+    stencils = [Stencil(i) for i in expressions]
+    dimensions = set.union(*[set(i.dimensions) for i in stencils])
+
+    # Filter out aliasing stepping dimensions
+    mapper = {d.parent: d for d in dimensions if d.is_Stepping}
+    return [i.replace(mapper) for i in stencils]
+
+
+def retrieve_offsets(stencils):
+    """
+    Return a mapper from :class:`Dimension`s to the min/max integer offsets
+    within ``stencils``.
+    """
+    offs = Stencil.union(*stencils)
+    mapper = {d: v for d, v in offs.diameter.items()}
+    mapper.update({d.parent: v for d, v in mapper.items() if d.is_Stepping})
+    return mapper
 
 
 # Misc helpers

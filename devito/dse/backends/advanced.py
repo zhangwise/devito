@@ -42,7 +42,7 @@ class AdvancedRewriter(BasicRewriter):
             # Some temporaries may be droppable at this point
             processed = compact_temporaries(found, leaves)
 
-        return cluster.reschedule(processed)
+        return cluster.rebuild(processed)
 
     @dse_pass
     def _factorize(self, cluster, *args, **kwargs):
@@ -155,7 +155,7 @@ class AdvancedRewriter(BasicRewriter):
             stencils.append(stencil)
 
         # Create the alias clusters
-        alias_clusters = clusterize(expressions, stencils, indices)
+        alias_clusters = clusterize(expressions, stencils)
         alias_clusters = sorted(alias_clusters, key=lambda i: i.is_dense)
 
         # Switch temporaries in the expression trees

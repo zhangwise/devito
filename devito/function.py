@@ -2,19 +2,20 @@ import numpy as np
 import sympy
 from collections import OrderedDict
 from functools import partial
+from psutil import virtual_memory
 
 from devito.parameters import configuration
 from devito.logger import debug, error, warning
 from devito.memory import CMemory, first_touch
 from devito.cgen_utils import INT, FLOAT
-from devito.dimension import Dimension
+from devito.dimension import Dimension, TimeDimension
 from devito.arguments import ConstantArgProvider, TensorFunctionArgProvider
 from devito.types import SymbolicFunction, AbstractSymbol
 from devito.finite_difference import (centered, cross_derivative,
                                       first_derivative, left, right,
                                       second_derivative, generic_derivative,
                                       second_cross_derivative)
-from devito.symbolics import Eq, indexify, retrieve_indexed
+from devito.symbolics import Eq, Inc, indexify, retrieve_indexed
 
 __all__ = ['Constant', 'Function', 'TimeFunction', 'SparseFunction',
            'Forward', 'Backward']
@@ -96,6 +97,7 @@ class Function(TensorFunction):
     :param shape: (Optional) shape of the associated data for this symbol.
     :param dimensions: (Optional) symbolic dimensions that define the
                        data layout and function indices of this symbol.
+    :param staggered: (Optional) tuple containing staggering offsets.
     :param dtype: (Optional) data type of the buffered data.
     :param space_order: Discretisation order for space derivatives
     :param initializer: Function to initialize the data, optional
@@ -108,6 +110,15 @@ class Function(TensorFunction):
        :class:`Function` objects are assumed to be constant in time
        and therefore do not support time derivatives. Use
        :class:`TimeFunction` for time-varying grid data.
+
+    .. note::
+
+       The tuple :param staggered: contains a ``1`` in each dimension
+       entry that should be staggered, and ``0`` otherwise. For example,
+       ``staggered=(1, 0, 0)`` entails discretization on horizontal edges,
+       ``staggered=(0, 0, 1)`` entails discretization on vertical edges,
+       ``staggered=(0, 1, 1)`` entails discretization side facets and
+       ``staggered=(1, 1, 1)`` entails discretization on cells.
     """
 
     is_Function = True
@@ -128,6 +139,12 @@ class Function(TensorFunction):
                 self.shape_domain = self.grid.shape_domain
                 self.dtype = kwargs.get('dtype', self.grid.dtype)
             self.indices = self._indices(**kwargs)
+            self.staggered = kwargs.get('staggered',
+                                        tuple(0 for _ in self.indices))
+            if len(self.staggered) != len(self.indices):
+                error("Staggering argument needs %s entries for indices %s"
+                      % (len(self.indices), self.indices))
+                raise ValueError("Insufficient staggered entries")
 
             self.space_order = kwargs.get('space_order', 1)
             self.initializer = kwargs.get('initializer', None)
@@ -136,66 +153,72 @@ class Function(TensorFunction):
             self._first_touch = kwargs.get('first_touch', configuration['first_touch'])
             self._data_object = None
 
-            # Dynamically create notational shortcuts for space derivatives
-            for dim in self.space_dimensions:
-                # First derivative, centred
-                dx = partial(first_derivative, order=self.space_order,
-                             dim=dim, side=centered)
-                setattr(self.__class__, 'd%s' % dim.name,
-                        property(dx, 'Return the symbolic expression for '
-                                 'the centered first derivative wrt. '
-                                 'the %s dimension' % dim.name))
+            # Dynamically add derivative short-cuts
+            self._initialize_derivatives()
 
-                # First derivative, left
-                dxl = partial(first_derivative, order=self.space_order,
-                              dim=dim, side=left)
-                setattr(self.__class__, 'd%sl' % dim.name,
-                        property(dxl, 'Return the symbolic expression for '
-                                 'the left-sided first derivative wrt. '
-                                 'the %s dimension' % dim.name))
+    def _initialize_derivatives(self):
+        """
+        Dynamically create notational shortcuts for space derivatives.
+        """
+        for dim in self.space_dimensions:
+            # First derivative, centred
+            dx = partial(first_derivative, order=self.space_order,
+                         dim=dim, side=centered)
+            setattr(self.__class__, 'd%s' % dim.name,
+                    property(dx, 'Return the symbolic expression for '
+                             'the centered first derivative wrt. '
+                             'the %s dimension' % dim.name))
 
-                # First derivative, right
-                dxr = partial(first_derivative, order=self.space_order,
-                              dim=dim, side=right)
-                setattr(self.__class__, 'd%sr' % dim.name,
-                        property(dxr, 'Return the symbolic expression for '
-                                 'the right-sided first derivative wrt. '
-                                 'the %s dimension' % dim.name))
+            # First derivative, left
+            dxl = partial(first_derivative, order=self.space_order,
+                          dim=dim, side=left)
+            setattr(self.__class__, 'd%sl' % dim.name,
+                    property(dxl, 'Return the symbolic expression for '
+                             'the left-sided first derivative wrt. '
+                             'the %s dimension' % dim.name))
 
-                # Second derivative
-                dx2 = partial(generic_derivative, deriv_order=2, dim=dim,
-                              fd_order=int(self.space_order / 2))
-                setattr(self.__class__, 'd%s2' % dim.name,
-                        property(dx2, 'Return the symbolic expression for '
-                                 'the second derivative wrt. the '
-                                 '%s dimension' % dim.name))
+            # First derivative, right
+            dxr = partial(first_derivative, order=self.space_order,
+                          dim=dim, side=right)
+            setattr(self.__class__, 'd%sr' % dim.name,
+                    property(dxr, 'Return the symbolic expression for '
+                             'the right-sided first derivative wrt. '
+                             'the %s dimension' % dim.name))
 
-                # Fourth derivative
-                dx4 = partial(generic_derivative, deriv_order=4, dim=dim,
-                              fd_order=max(int(self.space_order / 2), 2))
-                setattr(self.__class__, 'd%s4' % dim.name,
-                        property(dx4, 'Return the symbolic expression for '
-                                 'the fourth derivative wrt. the '
-                                 '%s dimension' % dim.name))
+            # Second derivative
+            dx2 = partial(generic_derivative, deriv_order=2, dim=dim,
+                          fd_order=int(self.space_order / 2))
+            setattr(self.__class__, 'd%s2' % dim.name,
+                    property(dx2, 'Return the symbolic expression for '
+                             'the second derivative wrt. the '
+                             '%s dimension' % dim.name))
 
-                for dim2 in self.space_dimensions:
-                    # First cross derivative
-                    dxy = partial(cross_derivative, order=self.space_order,
-                                  dims=(dim, dim2))
-                    setattr(self.__class__, 'd%s%s' % (dim.name, dim2.name),
-                            property(dxy, 'Return the symbolic expression for '
-                                     'the first cross derivative wrt. the '
-                                     '%s and %s dimensions' %
-                                     (dim.name, dim2.name)))
+            # Fourth derivative
+            dx4 = partial(generic_derivative, deriv_order=4, dim=dim,
+                          fd_order=max(int(self.space_order / 2), 2))
+            setattr(self.__class__, 'd%s4' % dim.name,
+                    property(dx4, 'Return the symbolic expression for '
+                             'the fourth derivative wrt. the '
+                             '%s dimension' % dim.name))
 
-                    # Second cross derivative
-                    dx2y2 = partial(second_cross_derivative, dims=(dim, dim2),
-                                    order=self.space_order)
-                    setattr(self.__class__, 'd%s2%s2' % (dim.name, dim2.name),
-                            property(dx2y2, 'Return the symbolic expression for '
-                                     'the second cross derivative wrt. the '
-                                     '%s and %s dimensions' %
-                                     (dim.name, dim2.name)))
+            for dim2 in self.space_dimensions:
+                # First cross derivative
+                dxy = partial(cross_derivative, order=self.space_order,
+                              dims=(dim, dim2))
+                setattr(self.__class__, 'd%s%s' % (dim.name, dim2.name),
+                        property(dxy, 'Return the symbolic expression for '
+                                 'the first cross derivative wrt. the '
+                                 '%s and %s dimensions' %
+                                 (dim.name, dim2.name)))
+
+                # Second cross derivative
+                dx2y2 = partial(second_cross_derivative, dims=(dim, dim2),
+                                order=self.space_order)
+                setattr(self.__class__, 'd%s2%s2' % (dim.name, dim2.name),
+                        property(dx2y2, 'Return the symbolic expression for '
+                                 'the second cross derivative wrt. the '
+                                 '%s and %s dimensions' %
+                                 (dim.name, dim2.name)))
 
     @classmethod
     def _indices(cls, **kwargs):
@@ -229,7 +252,7 @@ class Function(TensorFunction):
         """
         Full allocated shape of the data associated with this :class:`Function`.
         """
-        return self.shape_domain
+        return tuple(i - s for i, s in zip(self.shape_domain, self.staggered))
 
     @property
     def shape(self):
@@ -283,6 +306,16 @@ class Function(TensorFunction):
         return sum([second_derivative(first * weight, dim=d, order=order)
                     for d in self.space_dimensions])
 
+    @property
+    def symbolic_shape(self):
+        """
+        Return the symbolic shape of the object. This is simply the
+        appropriate combination of symbolic dimension sizes shifted
+        according to the ``staggered`` mask.
+        """
+        return tuple(i.symbolic_size - s for i, s in
+                     zip(self.indices, self.staggered))
+
 
 class TimeFunction(Function):
     """
@@ -291,11 +324,14 @@ class TimeFunction(Function):
     :param name: Name of the resulting :class:`sympy.Function` symbol
     :param grid: :class:`Grid` object from which to infer the data shape
                  and :class:`Dimension` indices.
+    :param staggered: (Optional) tuple containing staggering offsets.
     :param dtype: (Optional) data type of the buffered data
     :param save: Save the intermediate results to the data buffer. Defaults
-                 to `False`, indicating the use of alternating buffers.
-    :param time_dim: Size of the time dimension that dictates the leading
-                     dimension of the data buffer if :param save: is True.
+                 to ``None``, indicating the use of alternating buffers. If
+                 intermediate results are required, the value of save must
+                 be set to the required size of the time dimension.
+    :param time_dim: The :class:`Dimension` object to use to represent time in this
+                     symbol. Defaults to the time dimension provided by the :class:`Grid`.
     :param time_order: Order of the time discretization which affects the
                        final size of the leading time dimension of the
                        data buffer.
@@ -330,29 +366,34 @@ class TimeFunction(Function):
             super(TimeFunction, self).__init__(*args, **kwargs)
             self.time_dim = kwargs.get('time_dim', None)
             self.time_order = kwargs.get('time_order', 1)
-            self.save = kwargs.get('save', False)
+            self.save = kwargs.get('save', None)
 
-            if not self.save:
-                if self.time_dim is not None:
-                    warning('Explicit time dimension size (time_dim) found for '
-                            'TimeFunction symbol %s, despite \nusing a stepping time '
-                            'dimension (save=False). This value will be ignored!'
-                            % self.name)
-                self.time_dim = self.time_order + 1
-                self.indices[0].modulo = self.time_dim
+            if self.save is not None:
+                if not isinstance(self.save, int):
+                    raise ValueError("save must be an int indicating the number of " +
+                                     "timesteps to be saved (is %s)" % type(self.save))
+                available_mem = virtual_memory().available
+
+                if np.dtype(self.dtype).itemsize * self.save > available_mem:
+                    warning("Trying to allocate more memory for symbol %s " % self.name +
+                            "than available on physical device, this will start swapping")
+                self.time_size = self.save
             else:
-                if self.time_dim is None:
-                    error('Time dimension (time_dim) is required'
-                          'to save intermediate data with save=True')
-                    raise ValueError("Unknown time dimensions")
+                self.time_size = self.time_order + 1
+                self.indices[0].modulo = self.time_size
 
     @property
     def shape_data(self):
         """
         Full allocated shape of the data associated with this :class:`TimeFunction`.
         """
-        tsize = self.time_dim if self.save else self.time_order + 1
-        return (tsize, ) + self.shape_domain
+        if self.save:
+            tsize = self.time_size - self.staggered[0]
+        else:
+            tsize = self.time_order + 1
+        shape_domain = tuple(i - s for i, s in zip(self.shape_domain,
+                                                   self.staggered[1:]))
+        return (tsize, ) + shape_domain
 
     def initialize(self):
         if self.initializer is not None:
@@ -368,14 +409,21 @@ class TimeFunction(Function):
         """
         save = kwargs.get('save', None)
         grid = kwargs.get('grid', None)
+        time_dim = kwargs.get('time_dim', None)
 
         if grid is None:
             error('TimeFunction objects require a grid parameter.')
             raise ValueError('No grid provided for TimeFunction.')
 
-        tidx = grid.time_dim if save else grid.stepping_dim
+        if time_dim is None:
+            time_dim = grid.time_dim if save else grid.stepping_dim
+        elif not isinstance(time_dim, TimeDimension):
+            raise ValueError("time_dim must be a TimeDimension, not %s" % type(time_dim))
+
+        assert(isinstance(time_dim, Dimension) and time_dim.is_Time)
+
         _indices = Function._indices(**kwargs)
-        return tuple([tidx] + list(_indices))
+        return tuple([time_dim] + list(_indices))
 
     @property
     def dim(self):
@@ -456,7 +504,7 @@ class SparseFunction(CompositeFunction):
 
     def __init__(self, *args, **kwargs):
         if not self._cached():
-            self.nt = kwargs.get('nt')
+            self.nt = kwargs.get('nt', 0)
             self.npoint = kwargs.get('npoint')
             kwargs['shape'] = (self.nt, self.npoint)
             super(SparseFunction, self).__init__(self, *args, **kwargs)
@@ -468,7 +516,7 @@ class SparseFunction(CompositeFunction):
             # Allocate and copy coordinate data
             d = Dimension('d')
             self.coordinates = Function(name='%s_coords' % self.name,
-                                        dimensions=[self.indices[1], d],
+                                        dimensions=[self.indices[-1], d],
                                         shape=(self.npoint, self.grid.dim))
             self._children.append(self.coordinates)
             coordinates = kwargs.get('coordinates', None)
@@ -476,9 +524,9 @@ class SparseFunction(CompositeFunction):
                 self.coordinates.data[:] = coordinates[:]
 
     def __new__(cls, *args, **kwargs):
-        nt = kwargs.get('nt')
+        nt = kwargs.get('nt', 0)
         npoint = kwargs.get('npoint')
-        kwargs['shape'] = (nt, npoint)
+        kwargs['shape'] = (nt, npoint) if nt > 0 else (npoint, )
 
         return Function.__new__(cls, *args, **kwargs)
 
@@ -491,7 +539,9 @@ class SparseFunction(CompositeFunction):
         """
         dimensions = kwargs.get('dimensions', None)
         grid = kwargs.get('grid', None)
-        return dimensions or [grid.time_dim, Dimension('p')]
+        nt = kwargs.get('nt', 0)
+        indices = [grid.time_dim, Dimension('p')] if nt > 0 else [Dimension('p')]
+        return dimensions or indices
 
     @property
     def shape_data(self):
@@ -499,7 +549,7 @@ class SparseFunction(CompositeFunction):
         Full allocated shape of the data associated with this
         :class:`SparseFunction`.
         """
-        return (self.nt, self.npoint)
+        return (self.nt, self.npoint) if self.nt > 0 else (self.npoint, )
 
     @property
     def coefficients(self):
@@ -581,7 +631,7 @@ class SparseFunction(CompositeFunction):
     @property
     def coordinate_symbols(self):
         """Symbol representing the coordinate values in each dimension"""
-        p_dim = self.indices[1]
+        p_dim = self.indices[-1]
         return tuple([self.coordinates.indexify((p_dim, i))
                       for i in range(self.grid.dim)])
 
@@ -589,9 +639,9 @@ class SparseFunction(CompositeFunction):
     def coordinate_indices(self):
         """Symbol for each grid index according to the coordinates"""
         indices = self.grid.dimensions
-        return tuple([INT(sympy.Function('floor')(c / i.spacing))
-                      for c, i in zip(self.coordinate_symbols,
-                                      indices[:self.grid.dim])])
+        return tuple([INT(sympy.Function('floor')((c - o) / i.spacing))
+                      for c, o, i in zip(self.coordinate_symbols, self.grid.origin,
+                                         indices[:self.grid.dim])])
 
     @property
     def coordinate_bases(self):
@@ -639,9 +689,12 @@ class SparseFunction(CompositeFunction):
         subs = OrderedDict(zip(self.point_symbols, self.coordinate_bases))
         rhs = sum([expr.subs(vsub) * b.subs(subs)
                    for b, vsub in zip(self.coefficients, idx_subs)])
-
         # Apply optional time symbol substitutions to lhs of assignment
         lhs = self if p_t is None else self.subs(self.indices[0], p_t)
+
+        cummulative = kwargs.get("cummulative", False)
+        rhs = rhs + lhs if cummulative else rhs
+
         return [Eq(lhs, rhs)]
 
     def inject(self, field, expr, offset=0, **kwargs):
@@ -682,6 +735,6 @@ class SparseFunction(CompositeFunction):
 
         # Substitute coordinate base symbols into the coefficients
         subs = OrderedDict(zip(self.point_symbols, self.coordinate_bases))
-        return [Eq(field.subs(vsub),
-                   field.subs(vsub) + expr.subs(subs).subs(vsub) * b.subs(subs))
+        return [Inc(field.subs(vsub),
+                    field.subs(vsub) + expr.subs(subs).subs(vsub) * b.subs(subs))
                 for b, vsub in zip(self.coefficients, idx_subs)]
