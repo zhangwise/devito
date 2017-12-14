@@ -11,7 +11,7 @@ from devito.logger import debug, error, warning
 from devito.data import Data, first_touch
 from devito.cgen_utils import INT, FLOAT
 from devito.dimension import Dimension, TimeDimension
-from devito.arguments import ConstantArgProvider, TensorFunctionArgProvider
+from devito.arguments import ConstantArgProvider, TensorFunctionArgProvider, ArgumentMap
 from devito.types import SymbolicFunction, AbstractSymbol
 from devito.finite_difference import (centered, cross_derivative,
                                       first_derivative, left, right,
@@ -475,6 +475,17 @@ class Function(TensorFunction):
         """
         return tuple(i.symbolic_size - s for i, s in
                      zip(self.indices, self.staggered))
+
+    def argument_defaults(self):
+        """
+        Returns a map of default argument values defined by this symbol.
+        """
+        args = ArgumentMap({self.name: self.data})
+
+        # Collect default dimension arguments from all indices
+        for i, s in zip(self.indices, self.shape):
+            args.update(i.argument_defaults(size=s))
+        return args
 
 
 class TimeFunction(Function):
