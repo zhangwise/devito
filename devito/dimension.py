@@ -81,6 +81,21 @@ class Dimension(sympy.Symbol, DimensionArgProvider):
         """
         return {self.start_name: 0, self.end_name: size, self.size_name: size}
 
+    def argument_values(self, **kwargs):
+        """
+        Returns a map of argument values after evaluating user input.
+
+        :param kwargs: Dictionary of user-provided argument overrides.
+        """
+        values = {}
+
+        if self.start_name in kwargs:
+            values[self.start_name] = kwargs.pop(self.start_name)
+
+        if self.end_name in kwargs:
+            values[self.end_name] = kwargs.pop(self.end_name)
+
+        return values
 
 class SpaceDimension(Dimension):
 

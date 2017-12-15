@@ -186,6 +186,15 @@ class AbstractSymbol(sympy.Symbol, CachedSymbol):
         raise NotImplementedError('%s does not provide any default arguments' %
                                   self.__class__)
 
+    def argument_values(self, **kwargs):
+        """
+        Returns a map of argument values after evaluating user input.
+
+        :param kwargs: Dictionary of user-provided argument overrides.
+        """
+        raise NotImplementedError('%s does not provide argument value derivation' %
+                                  self.__class__)
+
 
 class Symbol(AbstractSymbol):
 
@@ -332,6 +341,14 @@ class AbstractFunction(sympy.Function, CachedSymbol):
         raise NotImplementedError('%s does not provide any default arguments' %
                                   self.__class__)
 
+    def argument_values(self, **kwargs):
+        """
+        Returns a map of argument values after evaluating user input.
+
+        :param kwargs: Dictionary of user-provided argument overrides.
+        """
+        raise NotImplementedError('%s does not provide argument value derivation' %
+                                  self.__class__)
 
 class SymbolicData(AbstractFunction):
 
