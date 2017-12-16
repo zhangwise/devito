@@ -123,7 +123,6 @@ class Function(TensorFunction):
                         approximation order, while ``lp`` and ``rp`` indicate
                         the maximum number of points that an approximation can
                         use on the two sides of the point of interest.
-    :param initializer: Function to initialize the data, optional
 
     .. note::
 
@@ -171,9 +170,6 @@ class Function(TensorFunction):
                 raise ValueError("'staggered' needs %s entries for indices %s"
                                  % (len(self.indices), self.indices))
 
-            self.initializer = kwargs.get('initializer', None)
-            if self.initializer is not None:
-                assert(callable(self.initializer))
             self._first_touch = kwargs.get('first_touch', configuration['first_touch'])
             self._data = None
 
@@ -335,11 +331,6 @@ class Function(TensorFunction):
         The number of grid points in the padding region on the left side.
         """
         return self._offset_halo
-
-    def initialize(self):
-        """Apply the data initilisation function, if it is not None."""
-        if self.initializer is not None:
-            self.initializer(self.data)
 
     @property
     def shape(self):

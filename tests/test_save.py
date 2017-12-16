@@ -16,20 +16,14 @@ def initial(dx=0.01, dy=0.01):
     return ui
 
 
-def initializer(data):
-    data[0, :] = initial()
-
-
 def run_simulation(save=False, dx=0.01, dy=0.01, a=0.5, timesteps=100):
     nx, ny = int(1 / dx), int(1 / dy)
     dx2, dy2 = dx**2, dy**2
     dt = dx2 * dy2 / (2 * a * (dx2 + dy2))
 
     grid = Grid(shape=(nx, ny))
-    u = TimeFunction(
-        name='u', grid=grid, save=timesteps, initializer=initializer,
-        time_order=1, space_order=2
-    )
+    u = TimeFunction(name='u', grid=grid, save=timesteps, time_order=1, space_order=2)
+    u.data[0, :] = initial()
 
     eqn = Eq(u.dt, a * (u.dx2 + u.dy2))
     stencil = solve(eqn, u.forward)[0]

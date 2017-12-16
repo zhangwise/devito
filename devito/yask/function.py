@@ -110,9 +110,6 @@ class Function(function.Function):
         return Data(self._data.grid, self.shape_with_halo, self.indices, self.dtype,
                     offset=self._offset_halo)
 
-    def initialize(self):
-        raise NotImplementedError
-
 
 class TimeFunction(function.TimeFunction, Function):
 
