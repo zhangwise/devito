@@ -94,7 +94,8 @@ class Operator(Callable):
                 time.reverse = time_axis == Backward
 
         # Parameters of the Operator (Dimensions necessary for data casts)
-        parameters = self.input + self.dimensions
+        parameter_dims = [d for d in self.dimensions if not d.is_Stepping]
+        parameters = self.input + parameter_dims
 
         # Group expressions based on their Stencil and data dependences
         clusters = clusterize(expressions, stencils)
