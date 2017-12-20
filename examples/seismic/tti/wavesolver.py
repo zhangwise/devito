@@ -108,7 +108,7 @@ class AnisotropicWaveSolver(object):
                                delta=delta, theta=theta, phi=phi, dt=self.dt, **kwargs)
         return rec, u, v, summary
 
-    def forwardDFT(self, freqs=None, nfreqs=1, src=None, rec=None, u=None, v=None, m=None,
+    def forwardDFT(self, freqsc=None, freqss=None, nfreqs=1, src=None, rec=None, u=None, v=None, m=None,
                    epsilon=None, delta=None, theta=None, phi=None,
                    save=False, kernel='centered', **kwargs):
         """
@@ -142,6 +142,7 @@ class AnisotropicWaveSolver(object):
             u = TimeFunction(name='u', grid=self.model.grid, save=save,
                              time_dim=self.source.nt if save else None,
                              time_order=self.time_order, space_order=self.space_order)
+        ufr = Function(name="ufr", shape=u.shape_data[1:] + (freqsc.shape_data[0],), dimensions=u.space_dimensions + (freqsc.indices[0],))
         # Create the forward wavefield if not provided
         if v is None:
             v = TimeFunction(name='v', grid=self.model.grid, save=save,
@@ -163,9 +164,9 @@ class AnisotropicWaveSolver(object):
         op = self.op_fwd_dft(nfreqs, kernel, save)
 
         if len(m.shape) == 2:
-            summary = op.apply(src=src, rec=rec, u=u, v=v, freqs=freqs, m=m, epsilon=epsilon,
+            summary = op.apply(src=src, rec=rec, u=u, ufr=ufr, v=v, freqsc=freqsc, freqss=freqss, m=m, epsilon=epsilon,
                                delta=delta, theta=theta, dt=self.dt, **kwargs)
         else:
-            summary = op.apply(src=src, rec=rec, u=u, v=v, freqs=freqs, m=m, epsilon=epsilon,
+            summary = op.apply(src=src, rec=rec, u=u, ufr=ufr, v=v, freqsc=freqsc, freqss=freqss, m=m, epsilon=epsilon,
                                delta=delta, theta=theta, phi=phi, dt=self.dt, **kwargs)
-        return rec, u, v, summary
+        return rec, u, v, ufr, summary

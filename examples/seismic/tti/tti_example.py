@@ -49,15 +49,17 @@ def run(shape=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=250.0,
 
     for i in (1, 2, 4, 8, 16, 32, 64):
         clear_cache()
-        solver = tti_setup(shape, spacing, tn, time_order, space_order, nbpml, **kwargs)
-
+        dt = solver.model.critical_dt
         fr = Dimension(name="fr")
-        freqs = Function(name="freqs", shape=(i,), dimensions=(fr,))
-        freqs.data[:] = np.linspace(2., 10., i).astype(np.float32)
-        rec, u, v, summary = solver.forwardDFT(autotune=autotune, kernel=kernel, freqs=freqs, nfreqs=i)
+        freqsc = Function(name="freqsc", shape=(i, solver.source.nt), dimensions=(fr, solver.model.grid.time_dim))
+        freqss = Function(name="freqss", shape=(i, solver.source.nt), dimensions=(fr, solver.model.grid.time_dim))
+        allfreqs = np.linspace(0.005, 0.0025, i).astype(np.float32)
+        for ff in range(i):
+            freqsc.data[ff, :] = np.cos(2 * np.pi * solver.source.time * dt * allfreqs[ff])
+            freqss.data[ff, :] = np.sin(2 * np.pi * solver.source.time * dt * allfreqs[ff])
+        rec, u, v, ufr, summary = solver.forwardDFT(autotune=autotune, kernel=kernel, freqsc=freqsc, freqss=freqss, nfreqs=i)
         timings[count] = np.sum([val for val in summary.timings.values()])
         count += 1
-
     plt.figure()
     plt.plot([0, 1, 2, 4, 8, 16, 32, 64], timings,'-*r')
     plt.xlabel("number of frequency slices")
@@ -95,11 +97,11 @@ if __name__ == "__main__":
     if args.dim2:
         shape = (150, 150)
         spacing = (10.0, 10.0)
-        tn = 750.0
+        tn = 1500.
     else:
         shape = (50, 50, 50)
         spacing = (10.0, 10.0, 10.0)
-        tn = 250.0
+        tn = 250.
 
     run(shape=shape, spacing=spacing, nbpml=args.nbpml, tn=tn,
         space_order=args.space_order, time_order=args.time_order,

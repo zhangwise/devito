@@ -470,20 +470,6 @@ def ForwardOperatorDFT(model, source, receiver, nfreqs=1, time_order=2, space_or
     first_stencil = Eq(u.forward, stencilp)
     second_stencil = Eq(v.forward, stencilr)
     stencils = [first_stencil, second_stencil]
-    
-
-    fr = Dimension(name="fr")
-    freqs = Function(name="freqs", shape=(nfreqs,), dimensions=(fr,))
-            
-    ufr = Function(name="ufr", shape=u.shape_data[1:] + freqs.shape_data, dimensions=u.space_dimensions + freqs.indices)
-    vfr = Function(name="vfr", shape=u.shape_data[1:] + freqs.shape_data, dimensions=v.space_dimensions + freqs.indices)
-    eqfur = [Eq(ufr, ufr + cos(2 * 3.1415 * u.grid.time_dim * u.grid.time_dim.spacing * freqs) * u)]
-    eqfvr = [Eq(vfr, vfr + cos(2 * 3.1415 * v.grid.time_dim * v.grid.time_dim.spacing * freqs) * v)]
-    
-    ufi = Function(name="ufi", shape=u.shape_data[1:] + freqs.shape_data, dimensions=u.space_dimensions + freqs.indices)
-    vfi = Function(name="vfi", shape=u.shape_data[1:] + freqs.shape_data, dimensions=v.space_dimensions + freqs.indices)
-    eqfui = [Eq(ufi, ufi + sin(2 * 3.1415 * u.grid.time_dim * u.grid.time_dim.spacing * freqs) * u)]
-    eqfvi = [Eq(vfi, vfi + sin(2 * 3.1415 * v.grid.time_dim * v.grid.time_dim.spacing * freqs) * v)]
 
     # Source and receivers
     stencils += src.inject(field=u.forward, expr=src * dt * dt / m,
@@ -493,6 +479,20 @@ def ForwardOperatorDFT(model, source, receiver, nfreqs=1, time_order=2, space_or
     stencils += rec.interpolate(expr=u + v, offset=model.nbpml)
     
     
+    fr = Dimension(name="fr")
+    freqsc = Function(name="freqsc", shape=(nfreqs, source.nt), dimensions=(fr, u.grid.time_dim))
+    freqss = Function(name="freqss", shape=(nfreqs, source.nt), dimensions=(fr, u.grid.time_dim))
+            
+    ufr = Function(name="ufr", shape=u.shape_data[1:] + (freqsc.shape_data[0],), dimensions=u.space_dimensions + (freqsc.indices[0],))
+    vfr = Function(name="vfr", shape=u.shape_data[1:] + (freqsc.shape_data[0],), dimensions=v.space_dimensions + (freqsc.indices[0],))
+    eqfur = [Eq(ufr, ufr + freqsc * u)]
+    eqfvr = [Eq(vfr, vfr + freqsc * v)]
+    
+    ufi = Function(name="ufi", shape=u.shape_data[1:] + (freqss.shape_data[0],), dimensions=u.space_dimensions + (freqss.indices[0],))
+    vfi = Function(name="vfi", shape=u.shape_data[1:] + (freqss.shape_data[0],), dimensions=v.space_dimensions + (freqss.indices[0],))
+    eqfui = [Eq(ufi, ufi + freqss * u)]
+    eqfvi = [Eq(vfi, vfi + freqss * v)]
+
     stencils += eqfur + eqfvr + eqfui + eqfvi
 
     # Substitute spacing terms to reduce flops
