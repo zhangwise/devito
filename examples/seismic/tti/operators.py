@@ -1,6 +1,6 @@
 from sympy import cos, sin
 
-from devito import Eq, Operator, TimeFunction
+from devito import Eq, Operator, TimeFunction, Function, Dimension
 from examples.seismic import PointSource, Receiver
 from devito.finite_difference import centered, first_derivative, right, transpose
 
@@ -419,6 +419,84 @@ def ForwardOperator(model, source, receiver, time_order=2, space_order=4,
     # Substitute spacing terms to reduce flops
     return Operator(stencils, subs=model.spacing_map, name='ForwardTTI', **kwargs)
 
+def ForwardOperatorDFT(model, source, receiver, nfreqs=1, time_order=2, space_order=4,
+                       save=False, kernel='centered', **kwargs):
+    """
+       Constructor method for the forward modelling operator in an acoustic media
+
+       :param model: :class:`Model` object containing the physical parameters
+       :param src: None ot IShot() (not currently supported properly)
+       :param data: IShot() object containing the acquisition geometry and field data
+       :param: time_order: Time discretization order
+       :param: spc_order: Space discretization order
+       """
+    dt = model.critical_dt
+
+    m, damp, epsilon, delta, theta, phi = (model.m, model.damp, model.epsilon,
+                                           model.delta, model.theta, model.phi)
+
+    # Create symbols for forward wavefield, source and receivers
+    u = TimeFunction(name='u', grid=model.grid,
+                     save=save, time_dim=source.nt if save else None,
+                     time_order=time_order, space_order=space_order)
+    v = TimeFunction(name='v', grid=model.grid,
+                     save=save, time_dim=source.nt if save else None,
+                     time_order=time_order, space_order=space_order)
+    src = PointSource(name='src', grid=model.grid, ntime=source.nt,
+                      npoint=source.npoint)
+    rec = Receiver(name='rec', grid=model.grid, ntime=receiver.nt,
+                   npoint=receiver.npoint)
+
+    # Tilt and azymuth setup
+    ang0 = cos(theta)
+    ang1 = sin(theta)
+    ang2 = 0
+    ang3 = 0
+    if len(model.shape) == 3:
+        ang2 = cos(phi)
+        ang3 = sin(phi)
+
+    FD_kernel = kernels[(kernel, len(model.shape))]
+    H0, Hz = FD_kernel(u, v, ang0, ang1, ang2, ang3, space_order)
+
+    # Stencils
+    s = model.grid.stepping_dim.spacing
+    stencilp = 1.0 / (2.0 * m + s * damp) * \
+        (4.0 * m * u + (s * damp - 2.0 * m) *
+         u.backward + 2.0 * s ** 2 * (epsilon * H0 + delta * Hz))
+    stencilr = 1.0 / (2.0 * m + s * damp) * \
+        (4.0 * m * v + (s * damp - 2.0 * m) *
+         v.backward + 2.0 * s ** 2 * (delta * H0 + Hz))
+    first_stencil = Eq(u.forward, stencilp)
+    second_stencil = Eq(v.forward, stencilr)
+    stencils = [first_stencil, second_stencil]
+    
+
+    fr = Dimension(name="fr")
+    freqs = Function(name="freqs", shape=(nfreqs,), dimensions=(fr,))
+            
+    ufr = Function(name="ufr", shape=u.shape_data[1:] + freqs.shape_data, dimensions=u.space_dimensions + freqs.indices)
+    vfr = Function(name="vfr", shape=u.shape_data[1:] + freqs.shape_data, dimensions=v.space_dimensions + freqs.indices)
+    eqfur = [Eq(ufr, ufr + cos(2 * 3.1415 * u.grid.time_dim * u.grid.time_dim.spacing * freqs) * u)]
+    eqfvr = [Eq(vfr, vfr + cos(2 * 3.1415 * v.grid.time_dim * v.grid.time_dim.spacing * freqs) * v)]
+    
+    ufi = Function(name="ufi", shape=u.shape_data[1:] + freqs.shape_data, dimensions=u.space_dimensions + freqs.indices)
+    vfi = Function(name="vfi", shape=u.shape_data[1:] + freqs.shape_data, dimensions=v.space_dimensions + freqs.indices)
+    eqfui = [Eq(ufi, ufi + sin(2 * 3.1415 * u.grid.time_dim * u.grid.time_dim.spacing * freqs) * u)]
+    eqfvi = [Eq(vfi, vfi + sin(2 * 3.1415 * v.grid.time_dim * v.grid.time_dim.spacing * freqs) * v)]
+
+    # Source and receivers
+    stencils += src.inject(field=u.forward, expr=src * dt * dt / m,
+                           offset=model.nbpml)
+    stencils += src.inject(field=v.forward, expr=src * dt * dt / m,
+                           offset=model.nbpml)
+    stencils += rec.interpolate(expr=u + v, offset=model.nbpml)
+    
+    
+    stencils += eqfur + eqfvr + eqfui + eqfvi
+
+    # Substitute spacing terms to reduce flops
+    return Operator(stencils, subs=model.spacing_map, name='ForwardTTI', **kwargs)
 
 kernels = {('shifted', 3): kernel_shifted_3d, ('shifted', 2): kernel_shifted_2d,
            ('centered', 3): kernel_centered_3d, ('centered', 2): kernel_centered_2d}

@@ -1,10 +1,12 @@
 import numpy as np
 from argparse import ArgumentParser
 
+from devito import Dimension, Function, clear_cache
 from devito.logger import warning
 from examples.seismic import demo_model, Receiver, RickerSource
 from examples.seismic.tti import AnisotropicWaveSolver
 
+import matplotlib.pyplot as plt
 
 def tti_setup(shape=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=250.0,
               time_order=2, space_order=4, nbpml=10, **kwargs):
@@ -36,14 +38,31 @@ def tti_setup(shape=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=250.0,
 def run(shape=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=250.0,
         autotune=False, time_order=2, space_order=4, nbpml=10,
         kernel='centered', **kwargs):
-
+        
     solver = tti_setup(shape, spacing, tn, time_order, space_order, nbpml, **kwargs)
-
+    timings = np.zeros((8, 1))
     if space_order % 4 != 0:
         warning('WARNING: TTI requires a space_order that is a multiple of 4!')
+    rec2, u2, v2, summary2 = solver.forward(autotune=autotune, kernel=kernel)
+    timings[0] = np.sum([val for val in summary2.timings.values()])
+    count=1
 
-    rec, u, v, summary = solver.forward(autotune=autotune, kernel=kernel)
+    for i in (1, 2, 4, 8, 16, 32, 64):
+        clear_cache()
+        solver = tti_setup(shape, spacing, tn, time_order, space_order, nbpml, **kwargs)
 
+        fr = Dimension(name="fr")
+        freqs = Function(name="freqs", shape=(i,), dimensions=(fr,))
+        freqs.data[:] = np.linspace(2., 10., i).astype(np.float32)
+        rec, u, v, summary = solver.forwardDFT(autotune=autotune, kernel=kernel, freqs=freqs, nfreqs=i)
+        timings[count] = np.sum([val for val in summary.timings.values()])
+        count += 1
+
+    plt.figure()
+    plt.plot([0, 1, 2, 4, 8, 16, 32, 64], timings,'-*r')
+    plt.xlabel("number of frequency slices")
+    plt.ylabel("Runtime (sec)")
+    plt.show()
     return summary.gflopss, summary.oi, summary.timings, [rec, u, v]
 
 
