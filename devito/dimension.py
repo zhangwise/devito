@@ -101,6 +101,9 @@ class Dimension(sympy.Symbol, DimensionArgProvider):
         if self.end_name in kwargs:
             values[self.end_name] = kwargs.pop(self.end_name)
 
+        if self.name in kwargs:
+            values[self.end_name] = kwargs.pop(self.name)
+
         return values
 
 class SpaceDimension(Dimension):
