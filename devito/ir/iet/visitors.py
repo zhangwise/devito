@@ -17,9 +17,9 @@ from devito.cgen_utils import blankline, ccode
 from devito.dimension import LoweredDimension
 from devito.exceptions import VisitorException
 from devito.ir.iet.nodes import Iteration, Node, UnboundedIndex
-from devito.types import Scalar
+from devito.types import Scalar, AbstractFunction, AbstractSymbol
 from devito.tools import as_tuple, filter_ordered, filter_sorted, flatten, ctypes_to_C
-
+from devito.arguments import PtrArgument
 
 __all__ = ['FindNodes', 'FindSections', 'FindSymbols', 'MapExpressions',
            'IsPerfectIteration', 'SubstituteExpression', 'printAST', 'CGen',
@@ -233,11 +233,11 @@ class CGen(Visitor):
         """Convert an iterable of :class:`Argument` into cgen format."""
         ret = []
         for i in args:
-            if i.is_ScalarArgument:
-                ret.append(c.Value('const %s' % c.dtype_to_ctype(i.dtype), i.name))
-            elif i.is_TensorArgument:
+            if isinstance(i, AbstractFunction):
                 ret.append(c.Value(c.dtype_to_ctype(i.dtype),
                                    '*restrict %s_vec' % i.name))
+            elif isinstance(i, AbstractSymbol):
+                ret.append(c.Value('const %s' % c.dtype_to_ctype(i.dtype), i.name))
             else:
                 ret.append(c.Value('void', '*_%s' % i.name))
         return ret
@@ -246,15 +246,15 @@ class CGen(Visitor):
         """Build cgen type casts for an iterable of :class:`Argument`."""
         ret = []
         for i in args:
-            if i.is_TensorArgument:
+            if isinstance(i, AbstractFunction):
                 align = "__attribute__((aligned(64)))"
                 shape = ''.join(["[%s]" % ccode(j)
-                                 for j in i.provider.symbolic_shape[1:]])
+                                 for j in i.symbolic_shape[1:]])
                 lvalue = c.POD(i.dtype, '(*restrict %s)%s %s' % (i.name, shape, align))
                 rvalue = '(%s (*)%s) %s' % (c.dtype_to_ctype(i.dtype), shape,
                                             '%s_vec' % i.name)
                 ret.append(c.Initializer(lvalue, rvalue))
-            elif i.is_PtrArgument:
+            elif isinstance(i, PtrArgument):
                 ctype = ctypes_to_C(i.dtype)
                 lvalue = c.Pointer(c.Value(ctype, i.name))
                 rvalue = '(%s*) %s' % (ctype, '_%s' % i.name)

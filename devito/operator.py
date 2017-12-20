@@ -7,26 +7,27 @@ import ctypes
 import numpy as np
 import sympy
 
-from devito.arguments import infer_dimension_values_tuple, ArgumentMap
+from devito.arguments import infer_dimension_values_tuple, ArgumentMap, ScalarArgument
 from devito.cgen_utils import Allocator
 from devito.compiler import jit_compile, load
 from devito.dimension import Dimension
 from devito.dle import transform
 from devito.dse import rewrite
 from devito.exceptions import InvalidArgument, InvalidOperator
-from devito.function import Forward, Backward, CompositeFunction
+from devito.function import Forward, Backward, CompositeFunction, Function
 from devito.logger import bar, error, info
 from devito.ir.clusters import clusterize
 from devito.ir.iet import (Element, Expression, Callable, Iteration, List,
                            LocalExpression, MapExpressions, ResolveTimeStepping,
                            SubstituteExpression, Transformer, NestedTransformer,
-                           analyze_iterations, compose_nodes, filter_iterations)
+                           analyze_iterations, compose_nodes, filter_iterations,
+                           FindSymbols)
 from devito.ir.support import Stencil
 from devito.parameters import configuration
 from devito.profiling import create_profile
 from devito.symbolics import indexify, retrieve_terminals
 from devito.tools import as_tuple, filter_sorted, flatten, numpy_to_ctypes
-from devito.types import Object
+from devito.types import Object, AbstractFunction, AbstractSymbol
 
 
 class Operator(Callable):
@@ -134,6 +135,33 @@ class Operator(Callable):
 
         # Introduce all required C declarations
         nodes = self._insert_declarations(dle_state.nodes)
+
+        # Determine dimension-related symbols (dim_s, dim_e, dim_size)
+        # directy from the IET.
+        ###################
+        # Developer note:
+        ###################
+        # This is still a bit hacky and only determines the
+        # start/end symbols from Iterations atm. To do this properly,
+        # we should improve the symbol/parameter finder utilities to
+        # cleanly pick out all required, but not defined, symbols from
+        # the final generated IR.  As an aside, this will also help in
+        # cleaning up DLE/AT-specific parameters, as they are in the
+        # tree already and can be dealt with generically .
+        free_symbols = FindSymbols('free-symbols').visit(nodes)
+        symbols = [s for s in free_symbols if not isinstance(s, Dimension)]
+        in_names = [f.name for f in self.input]
+        symbols = [s for s in symbols if s.name not in in_names]
+
+        # Add the dimenion sizes arguments for data casts
+        # TODO: This should really be derived from the expression tree.
+        sym = []
+        for f in self.input:
+            sym += f.symbolic_shape[1:]
+        symbols += filter_sorted(sym, key=attrgetter('name'))
+
+        # Replace parameters with the hacked-up "real parameters"
+        parameters = self.input + symbols + [parameters[-1].rtargs[0]]
 
         # Finish instantiation
         super(Operator, self).__init__(self.name, nodes, 'int', parameters, ())
@@ -297,10 +325,10 @@ class Operator(Callable):
             # Associate a C type to each argument for runtime type check
             argtypes = []
             for i in self.parameters:
-                if i.is_ScalarArgument:
-                    argtypes.append(numpy_to_ctypes(i.dtype))
-                elif i.is_TensorArgument:
+                if isinstance(i, AbstractFunction):
                     argtypes.append(np.ctypeslib.ndpointer(dtype=i.dtype, flags='C'))
+                elif isinstance(i, AbstractSymbol):
+                    argtypes.append(numpy_to_ctypes(i.dtype))
                 else:
                     argtypes.append(ctypes.c_void_p)
             self._cfunction.argtypes = argtypes

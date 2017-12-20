@@ -475,11 +475,11 @@ class Callable(Node):
         self.retval = retval
         self.prefix = prefix
 
-        if all(isinstance(i, ArgumentProvider) for i in parameters):
-            args = flatten([i.rtargs for i in parameters])
-        else:
-            assert(all(isinstance(i, Argument) for i in parameters))
-            args = parameters
+        # if all(isinstance(i, ArgumentProvider) for i in parameters):
+        #     args = flatten([i.rtargs for i in parameters])
+        # else:
+        #     assert(all(isinstance(i, Argument) for i in parameters))
+        args = parameters
         self.parameters = as_tuple(args)
 
     def __repr__(self):

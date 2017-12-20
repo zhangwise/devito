@@ -223,6 +223,9 @@ class SteppingDimension(Dimension):
         if self.end_name in kwargs:
             values[self.parent.end_name] = kwargs.pop(self.end_name)
 
+        if self.name in kwargs:
+            values[self.parent.end_name] = kwargs.pop(self.name)
+
         return values
 
 class LoweredDimension(Dimension):
