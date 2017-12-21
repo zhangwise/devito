@@ -606,10 +606,8 @@ class TimeFunction(Function):
             error('TimeFunction objects require a grid parameter.')
             raise ValueError('No grid provided for TimeFunction.')
 
-        if time_dim is not None:
-            tidx = time_dim
-        else:
-            tidx = grid.time_dim if save else grid.stepping_dim
+        if time_dim is None:
+            time_dim = grid.time_dim if save else grid.stepping_dim
 
         _indices = Function._indices(**kwargs)
         return tuple([time_dim] + list(_indices))
