@@ -132,14 +132,14 @@ class TensorFunction(SymbolicFunction):
         """Allocate memory as a :class:`Data`."""
         def wrapper(self):
             if self._data is None:
-                debug("Allocating memory for %s (%s)" % (self.name, self.shape))
-                self._data = Data(self.shape, self.indices, self.dtype)
+                debug("Allocating memory for %s%s" % (self.name, self.shape_allocated))
+                self._data = Data(self.shape_allocated, self.indices, self.dtype)
                 if self._first_touch:
                     first_touch(self)
                 else:
-                    self.data.fill(0)
+                    self._data.fill(0)
                 if self.initializer is not None:
-                    self.initializer(self.data)
+                    self.initializer(self._data)
             return func(self)
         return wrapper
 
@@ -231,10 +231,7 @@ class TensorFunction(SymbolicFunction):
         Shape of the domain plus the read-only stencil boundary associated
         with this :class:`Function`.
         """
-        # TODO: for the domain-allocation switch, this needs to return the shape
-        # of the data including the halo region, ie:
-        # `tuple(j + i + k for i, (j, k) in zip(self.shape_domain, self._halo))`
-        raise NotImplementedError
+        return tuple(j + i + k for i, (j, k) in zip(self.shape_domain, self._halo))
 
     @property
     def shape_allocated(self):
@@ -243,10 +240,7 @@ class TensorFunction(SymbolicFunction):
         It includes the domain and halo regions, as well as any additional
         padding outside of the halo.
         """
-        # TODO: for the domain-allocation switch, this needs to return the shape
-        # of the data including the halo and padding regions, ie:
-        # `tuple(j + i + k for i, (j, k) in zip(self.shape_with_halo, self._padding))`
-        raise NotImplementedError
+        return tuple(j + i + k for i, (j, k) in zip(self.shape_with_halo, self._padding))
 
     @property
     def data(self):
@@ -261,7 +255,7 @@ class TensorFunction(SymbolicFunction):
     @_allocate_memory
     def data_domain(self):
         """
-        The domain data values, as a :class:`numpy.ndarray`.
+        The domain data values.
 
         Elements are stored in row-major format.
 
@@ -269,9 +263,8 @@ class TensorFunction(SymbolicFunction):
 
             Alias to ``self.data``.
         """
-        # TODO: for the domain-allocation switch, this needs to be turned
-        # into a view of the domain region
-        return self._data
+        return self._data[tuple(slice(i, -j) if j != 0 else slice(i, None)
+                          for i, j in self._offset_domain)]
 
     @property
     @_allocate_memory
@@ -281,9 +274,8 @@ class TensorFunction(SymbolicFunction):
 
         Elements are stored in row-major format.
         """
-        # TODO: for the domain-allocation switch, this needs to be turned
-        # into a view of the halo region
-        raise NotImplementedError
+        return self._data[tuple(slice(i, -j) if j != 0 else slice(i, None)
+                          for i, j in self._offset_halo)]
 
     @property
     @_allocate_memory
@@ -293,9 +285,7 @@ class TensorFunction(SymbolicFunction):
 
         Elements are stored in row-major format.
         """
-        # TODO: for the domain-allocation switch, this needs to return all
-        # allocated data values, i.e. self._data
-        raise NotImplementedError
+        return self._data
 
     @property
     def dimensions(self):
