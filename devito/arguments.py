@@ -311,10 +311,10 @@ class ArgumentEngine(object):
         return values
 
     def _verify(self, values):
-        verify = True
+        verified = True
         for i in values:
-            verify = verify and all(verify(i, x) for x in i.verified_by)
-        return verify
+            verified = verified and all(verify(i, x) for x in i.verified_by)
+        return verified
 
     @property
     def dimensions(self):
@@ -331,10 +331,11 @@ class ArgumentVisitor(GenericVisitor):
         return o
 
     def visit_DimensionParameter(self, o):
-        dependency = ValueDependency(o)
-        size = ScalarArgument(o.provider.size_name, o, [dependency])
-        start = ScalarArgument(o.provider.start_name, o, [dependency])
-        end = ScalarArgument(o.provider.end_name, o, [dependency])
+        value_dep = ValueDependency(o)
+        verify_dep = VerifyDependency(o)
+        size = ScalarArgument(o.provider.size_name, o, [value_dep, verify_dep])
+        start = ScalarArgument(o.provider.start_name, o, [value_dep, verify_dep])
+        end = ScalarArgument(o.provider.end_name, o, [value_dep, verify_dep])
         return [size, start, end]
 
     def visit_Object(self, o):
@@ -536,3 +537,7 @@ def derive_dle_arg_value(blocked_dim, known_values, dle_argument):
 
 def get_value(consumer, provider, known_values):
     return ValueVisitor(consumer, known_values).visit(provider)
+
+
+def verify():
+    pass
