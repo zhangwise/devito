@@ -2,7 +2,7 @@ import sympy
 import numpy as np
 from cached_property import cached_property
 
-from devito.types import Symbol
+from devito.types import Scalar
 
 __all__ = ['Dimension', 'SpaceDimension', 'TimeDimension', 'SteppingDimension']
 
@@ -39,15 +39,15 @@ class Dimension(sympy.Symbol):
     @cached_property
     def symbolic_size(self):
         """The symbolic size of this dimension."""
-        return Symbol(name=self.size_name)
+        return Scalar(name=self.size_name, dtype=np.int32)
 
     @cached_property
     def symbolic_start(self):
-        return Symbol(name=self.start_name)
+        return Scalar(name=self.start_name, dtype=np.int32)
 
     @cached_property
     def symbolic_end(self):
-        return Symbol(name=self.end_name)
+        return Scalar(name=self.end_name, dtype=np.int32)
 
     @property
     def symbolic_extent(self):
