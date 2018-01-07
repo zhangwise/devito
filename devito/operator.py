@@ -19,7 +19,8 @@ from devito.ir.clusters import clusterize
 from devito.ir.iet import (Element, Expression, Callable, Iteration, List,
                            LocalExpression, MapExpressions, ResolveTimeStepping,
                            SubstituteExpression, Transformer, NestedTransformer,
-                           analyze_iterations, compose_nodes, filter_iterations)
+                           analyze_iterations, compose_nodes, filter_iterations,
+                           FindSymbols)
 from devito.ir.support import Stencil
 from devito.parameters import configuration
 from devito.profiling import create_profile
@@ -137,6 +138,19 @@ class Operator(Callable):
         self.argument_engine = ArgumentEngine(stencils, parameters, self.dle_arguments)
 
         parameters = self.argument_engine.arguments
+
+        # Pick all used symbols from the kernel, but exclude raw Dimensions
+        free_symbols = FindSymbols('free-symbols').visit(nodes)
+        symbols = [s for s in free_symbols if not isinstance(s, Dimension)]
+
+        # Derive parameters as symbols not defined in the kernel
+        # itself.  TODO: The filtering is currently name-based as the
+        # LoweredDimension objects used in expressions for
+        # SteppingDimension indices do not match the corresponding
+        # UnboundedIndex objects in the IR-AST hierarchy.
+        # This should really should be fixed!
+        defines = [s.name for s in FindSymbols('defines').visit(nodes)]
+        parameters = tuple(s for s in symbols if s.name not in defines)
 
         # Finish instantiation
         super(Operator, self).__init__(self.name, nodes, 'int', parameters, ())
