@@ -560,6 +560,13 @@ class LocalExpression(Expression):
         super(LocalExpression, self).__init__(expr)
         self.dtype = dtype
 
+    @property
+    def defines(self):
+        """
+        Return any symbols an :class:`LocalExpression` may define.
+        """
+        return (self.write, )
+
 
 class UnboundedIndex(object):
 
