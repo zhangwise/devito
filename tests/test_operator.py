@@ -205,12 +205,13 @@ class TestAllocation(object):
     @pytest.mark.parametrize('shape', [(20, 20),
                                        (20, 20, 20),
                                        (20, 20, 20, 20)])
-    def test_first_touch(self, shape):
+    @pytest.mark.parametrize('cls', [Function, TimeFunction])
+    def test_first_touch(self, shape, cls):
         dimensions = dimify('i j k l')[:len(shape)]
         grid = Grid(shape=shape, dimensions=dimensions)
-        m = Function(name='m', grid=grid, first_touch=True)
+        m = cls(name='m', grid=grid, first_touch=True)
         assert(np.allclose(m.data, 0))
-        m2 = Function(name='m2', grid=grid, first_touch=False)
+        m2 = cls(name='m2', grid=grid, first_touch=False)
         assert(np.allclose(m2.data, 0))
         assert(np.array_equal(m.data, m2.data))
 
