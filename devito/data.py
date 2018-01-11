@@ -41,10 +41,12 @@ class Data(np.ndarray):
     """
 
     def __new__(cls, shape, dimensions, dtype):
+        assert len(shape) == len(dimensions)
         ndarray, c_pointer = malloc_aligned(shape, dtype)
         obj = np.asarray(ndarray).view(cls)
         obj._c_pointer = c_pointer
-        obj.modulo = tuple(i.modulo if i.is_Stepping else None for i in dimensions)
+        obj.modulo = tuple(j if i.is_Stepping else None
+                           for i, j in zip(dimensions, shape))
         return obj
 
     def __del__(self):

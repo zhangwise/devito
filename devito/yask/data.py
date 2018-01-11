@@ -52,12 +52,14 @@ class Data(object):
     __array_priority__ = 1000
 
     def __init__(self, grid, shape, dimensions, dtype, offset=None):
+        assert len(shape) == len(dimensions)
         self.grid = grid
         self.dimensions = dimensions
         self.shape = shape
         self.dtype = dtype
 
-        self._modulo = tuple(i.modulo if i.is_Stepping else None for i in dimensions)
+        self._modulo = tuple(j if i.is_Stepping else None
+                             for i, j in zip(dimensions, shape))
 
         offset = offset or tuple(0 for _ in dimensions)
         assert len(offset) == len(dimensions)
