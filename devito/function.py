@@ -735,11 +735,15 @@ class SparseFunction(CompositeFunction):
             d = Dimension(name='d')
             self.coordinates = Function(name='%s_coords' % self.name,
                                         dimensions=[self.indices[-1], d],
-                                        shape=(self.npoint, self.grid.dim))
+                                        shape=(self.npoint, self.grid.dim),
+                                        space_order=0)
             self._children.append(self.coordinates)
             coordinates = kwargs.get('coordinates', None)
             if coordinates is not None:
                 self.coordinates.data[:] = coordinates[:]
+
+            # A SparseFunction has no halo region
+            self._halo = tuple((0, 0) for i in range(self.dim))
 
     def __new__(cls, *args, **kwargs):
         nt = kwargs.get('nt', 0)
@@ -768,6 +772,11 @@ class SparseFunction(CompositeFunction):
         :class:`SparseFunction`.
         """
         return (self.nt, self.npoint) if self.nt > 0 else (self.npoint, )
+
+    @property
+    def ndim(self):
+        """Return the number of spatial dimensions."""
+        return len(self.dimensions)
 
     @property
     def coefficients(self):
