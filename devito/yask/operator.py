@@ -40,9 +40,9 @@ class Operator(OperatorRunnable):
         # list of linked libraries
         self._compiler = configuration.yask['compiler'].copy()
 
-    def _specialize(self, nodes, parameters):
+    def _specialize_iet(self, nodes, parameters):
         """
-        Create a YASK representation of this Iteration/Expression tree.
+        Create a YASK representation of the Iteration/Expression tree.
 
         ``parameters`` is modified in-place adding YASK-related arguments.
         """
