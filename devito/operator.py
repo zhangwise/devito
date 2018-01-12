@@ -74,8 +74,10 @@ class Operator(Callable):
         # References to local or external routines
         self.func_table = OrderedDict()
 
-        # Expression lowering and analysis
-        expressions = [Eq(e, subs=subs) for e in expressions]
+        # Expression lowering
+        expressions = self._specialize_exprs(expressions, subs)
+
+        # Expression analysis
         self.dtype = retrieve_dtype(expressions)
         self.input, self.output, self.dimensions = retrieve_symbols(expressions)
 
@@ -99,7 +101,7 @@ class Operator(Callable):
         nodes, self.profiler = self._profile_sections(nodes, parameters)
 
         # Translate into backend-specific representation (e.g., GPU, Yask)
-        nodes = self._specialize(nodes, parameters)
+        nodes = self._specialize_iet(nodes, parameters)
 
         # Apply the Devito Loop Engine (DLE) for loop optimization
         dle_state = transform(nodes, *set_dle_mode(dle))
@@ -190,7 +192,13 @@ class Operator(Callable):
         best block sizes when loop blocking is in use."""
         return arguments
 
-    def _specialize(self, nodes, parameters):
+    def _specialize_exprs(self, expressions, subs):
+        """Transform the SymPy expressions in input to the Operator into a
+        backend-specific representation.
+        """
+        return [Eq(e, subs=subs) for e in expressions]
+
+    def _specialize_iet(self, nodes, parameters):
         """Transform the Iteration/Expression tree into a backend-specific
         representation, such as code to be executed on a GPU or through a
         lower-level tool."""
