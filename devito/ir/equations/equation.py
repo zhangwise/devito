@@ -103,7 +103,8 @@ class LoweredEq(Eq, EqMixin):
         expr = super(LoweredEq, cls).__new__(cls, expr.lhs, expr.rhs, evaluate=False)
         expr.is_Increment = getattr(input_expr, 'is_Increment', False)
         expr.dspace = DataSpace(intervals)
-        expr.ispace = IterationSpace([i.negate() for i in intervals], iterators)
+        expr.ispace = IterationSpace([Interval(i.dim, 0, 0) for i in intervals],
+                                     iterators)
 
         return expr
 
