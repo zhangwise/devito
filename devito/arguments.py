@@ -425,7 +425,11 @@ class ValueVisitor(GenericVisitor):
 
     def visit_TensorArgument(self, o, param):
         assert(isinstance(self.consumer, DimensionParameter))
-        return self.known_values[o].shape[param]
+        # At this point we need to return the runtime domain shape, so we must
+        # subtract the halo+padding regions from the data shape
+        shape = [i - sum(j) for i, j in
+                 zip(self.known_values[o].shape, o.provider._offset_domain)]
+        return shape[param]
 
 
 class Dependency(object):
