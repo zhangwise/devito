@@ -26,7 +26,7 @@ def symbol(name, dimensions, value=0., shape=(3, 5), mode='function'):
     and "indexed" API."""
     assert(mode in ['function', 'indexed'])
     s = Function(name=name, dimensions=dimensions, shape=shape)
-    s.data[:] = value
+    s.data_allocated[:] = value
     return s.indexify() if mode == 'indexed' else s
 
 
@@ -57,7 +57,7 @@ class TestCodeGen(object):
         assert op.parameters[4].is_ScalarArgument
         assert op.parameters[5].name == 'timers'
         assert op.parameters[5].is_PtrArgument
-        assert 'a_dense[i] = 2.0F*constant + a_dense[i]' in str(op.ccode)
+        assert 'a_dense[i + 1] = 2.0F*constant + a_dense[i + 1]' in str(op)
 
     @pytest.mark.parametrize('expr, so, to, expected', [
         ('Eq(u.forward,u+1)', 0, 1, 'Eq(u[t+1,x,y,z],u[t,x,y,z]+1)'),
@@ -159,10 +159,10 @@ class TestArithmetic(object):
     def test_indexed_increment(self, expr, result):
         """Tests point-wise increments with stencil offsets in one dimension"""
         j, l = dimify('j l')
-        a = symbol(name='a', dimensions=(j, l), value=2., shape=(5, 6),
+        a = symbol(name='a', dimensions=(j, l), value=1., shape=(5, 6),
                    mode='indexed').base
         fa = a.function
-        fa.data[1:, 1:] = 0
+        fa.data[:] = 0.
 
         eqn = eval(expr)
         Operator(eqn)(a=fa)
@@ -844,8 +844,8 @@ class TestLoopScheduler(object):
          Forward, ['txyz', 'txyz', 'txy'], 'txyzz'),
         # WAR 1->2; WAW 2->3; expected=3
         (('Eq(tu[t,x,y,z], tu[t,x,y,z] + tv[t,x,y,z])',
-          'Eq(tv[t,x,y,z], tu[t,x,y,z+2])',
-          'Eq(tw[t,x,y,z], tv[t,x,y,z+3] + 1.)'),
+          'Eq(tv[t,x,y,z], tu[t,x,y,z+1])',
+          'Eq(tw[t,x,y,z], tv[t,x,y,z+2] + 1.)'),
          Forward, ['txyz', 'txyz', 'txyz'], 'txyzzz'),
         # WAR 1->2; WAW 1->3; expected=3
         (('Eq(tu[t,x,y,z], tu[t,x,y,z] + tv[t,x,y,z])',
