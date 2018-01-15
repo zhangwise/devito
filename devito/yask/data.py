@@ -58,8 +58,7 @@ class Data(object):
         self.shape = shape
         self.dtype = dtype
 
-        self._modulo = tuple(j if i.is_Stepping else None
-                             for i, j in zip(dimensions, shape))
+        self._modulo = tuple(True if i.is_Stepping else False for i in dimensions)
 
         offset = offset or tuple(0 for _ in dimensions)
         assert len(offset) == len(dimensions)
@@ -147,7 +146,7 @@ class Data(object):
         cstart = []
         cstop = []
         cshape = []
-        for i, size, mod in zip(index, self.shape, self._modulo):
+        for i, size, use_modulo in zip(index, self.shape, self._modulo):
             if isinstance(i, type(np.newaxis)):
                 raise NotImplementedError("Unsupported introduction of np.newaxis")
             elif isinstance(i, (np.ndarray, tuple, list)):
@@ -177,9 +176,9 @@ class Data(object):
                     stop = i
                 shape = 1 if mode == 'set' else None
             # Apply logical indexing
-            if mod is not None:
-                start %= mod
-                stop %= mod
+            if use_modulo is True:
+                start %= size
+                stop %= size
             # Finally append the converted index
             cstart.append(start)
             cstop.append(stop)
