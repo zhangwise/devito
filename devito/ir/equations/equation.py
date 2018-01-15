@@ -93,7 +93,8 @@ class Eq(sympy.Eq, EqMixin):
 
         # Data space and Iteration space
         expr.dspace = DataSpace(intervals)
-        expr.ispace = IterationSpace([i.negate() for i in intervals], iterators)
+        expr.ispace = IterationSpace([Interval(i.dim, 0, 0) for i in intervals],
+                                     iterators)
 
         return expr
 
