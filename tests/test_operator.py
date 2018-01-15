@@ -339,7 +339,7 @@ class TestArguments(object):
             'x_size': 5, 'x_s': 0, 'x_e': 5,
             'y_size': 6, 'y_s': 0, 'y_e': 6,
             'z_size': 7, 'z_s': 0, 'z_e': 7,
-            'f': f.data, 'g': g.data,
+            'f': f.data_allocated, 'g': g.data_allocated,
         }
         self.verify_arguments(op.arguments(), expected)
 
@@ -388,7 +388,7 @@ class TestArguments(object):
             'x_size': 5, 'x_s': 0, 'x_e': 3,
             'y_size': 6, 'y_s': 0, 'y_e': 4,
             'z_size': 7, 'z_s': 0, 'z_e': 5,
-            'g': g.data
+            'g': g.data_allocated
         }
         self.verify_arguments(arguments, expected)
         # Verify execution
@@ -410,7 +410,7 @@ class TestArguments(object):
             'x_size': 5, 'x_s': 1, 'x_e': 3,
             'y_size': 6, 'y_s': 2, 'y_e': 4,
             'z_size': 7, 'z_s': 3, 'z_e': 5,
-            'g': g.data
+            'g': g.data_allocated
         }
         self.verify_arguments(arguments, expected)
         # Verify execution
@@ -443,7 +443,7 @@ class TestArguments(object):
             'z_size': 7, 'z_s': 3, 'z_e': 5,
             'time_s': 1, 'time_e': 4,
             't_s': 1, 't_e': 4,
-            'f': f.data
+            'f': f.data_allocated
         }
         self.verify_arguments(arguments, expected)
         # Verify execution
@@ -479,10 +479,10 @@ class TestArguments(object):
         assert (a2.data[:] == 6.).all()
 
         # Override with user-allocated numpy data
-        a3 = np.zeros_like(a.data)
+        a3 = np.zeros_like(a.data_allocated)
         a3[:] = 4.
         op(a=a3)
-        assert (a3[:] == 7.).all()
+        assert (a3[[slice(i.left, -i.right) for i in a._offset_domain]] == 7.).all()
 
     def test_override_timefunction_data(self):
         """
@@ -512,10 +512,10 @@ class TestArguments(object):
         assert (a2.data[:] == 6.).all()
 
         # Override with user-allocated numpy data
-        a3 = np.zeros_like(a.data)
+        a3 = np.zeros_like(a.data_allocated)
         a3[:] = 4.
         op(t=2, a=a3)
-        assert (a3[:] == 7.).all()
+        assert (a3[[slice(i.left, -i.right) for i in a._offset_domain]] == 7.).all()
 
     def test_dimension_size_infer(self, nt=100):
         """Test that the dimension sizes are being inferred correctly"""
@@ -543,7 +543,7 @@ class TestArguments(object):
         args = {time.end_name: nt-10}
         op_arguments = op.arguments(**args)
         assert(op_arguments[time.start_name] == 0)
-        assert(op_arguments[time.end_name] == nt - 8)
+        assert(op_arguments[time.end_name] == nt - 10)
 
     def test_dimension_offset_adjust(self, nt=100):
         """Test that the dimension sizes are being inferred correctly"""
