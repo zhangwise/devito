@@ -10,9 +10,10 @@ import pytest
 from devito import (clear_cache, Grid, Eq, Operator, Constant, Function, Backward,
                     Forward, TimeFunction, SparseFunction, Dimension, configuration,
                     error)
+from devito.arguments import runtime_arguments
 from devito.foreign import Operator as OperatorForeign
 from devito.ir.iet import (Expression, Iteration, FindNodes, IsPerfectIteration,
-                           retrieve_iteration_tree)
+                           CGen, retrieve_iteration_tree)
 
 
 def dimify(dimensions):
@@ -57,6 +58,49 @@ class TestCodeGen(object):
         assert op.parameters[5].name == 'timers'
         assert op.parameters[5].is_PtrArgument
         assert 'a_dense[i] = 2.0F*constant + a_dense[i]' in str(op.ccode)
+
+    @pytest.mark.parametrize('expr, so, to, expected', [
+        ('Eq(u.forward,u+1)', 0, 1, 'Eq(u[t+1,x,y,z],u[t,x,y,z]+1)'),
+        ('Eq(u.forward,u+1)', 1, 1, 'Eq(u[t+1,x+1,y+1,z+1],u[t,x+1,y+1,z+1]+1)'),
+        ('Eq(u.forward,u+1)', 1, 2, 'Eq(u[t+2,x+1,y+1,z+1],u[t+1,x+1,y+1,z+1]+1)'),
+        ('Eq(u.forward,u+u.backward + m)', 8, 2,
+         'Eq(u[t+2,x+4,y+4,z+4],m[x,y,z]+u[t,x+4,y+4,z+4]+u[t+1,x+4,y+4,z+4])')
+    ])
+    def test_index_shifting(self, expr, so, to, expected):
+        """Tests that array accesses get properly shifted based on the halo and
+        padding regions extent."""
+        grid = Grid(shape=(4, 4, 4))
+        x, y, z = grid.dimensions
+        t = grid.stepping_dim  # noqa
+
+        u = TimeFunction(name='u', grid=grid, space_order=so, time_order=to)  # noqa
+        m = Function(name='m', grid=grid, space_order=0)  # noqa
+        expr = eval(expr)
+
+        op = Operator(expr, dse='noop', dle='noop')
+        lowered = op._specialize_exprs([expr], None)[0]
+        assert str(lowered).replace(' ', '') == expected
+
+    @pytest.mark.parametrize('so, to, padding, expected', [
+        (0, 1, 0, '(float(*)[x_size][y_size][z_size])u_vec'),
+        (2, 1, 0, '(float(*)[x_size+1+1][y_size+1+1][z_size+1+1])u_vec'),
+        (4, 1, 0, '(float(*)[x_size+2+2][y_size+2+2][z_size+2+2])u_vec'),
+        (4, 3, 0, '(float(*)[x_size+2+2][y_size+2+2][z_size+2+2])u_vec'),
+        (4, 1, 3, '(float(*)[x_size+2+2+3+3][y_size+2+2+3+3][z_size+2+2+3+3])u_vec'),
+        ((2, 5, 2), 1, 0, '(float(*)[x_size+2+5][y_size+2+5][z_size+2+5])u_vec'),
+        ((2, 5, 4), 1, 3,
+         '(float(*)[x_size+3+3+4+5][y_size+3+3+4+5][z_size+3+3+4+5])u_vec'),
+    ])
+    def test_array_casts(self, so, to, padding, expected):
+        """Tests that data casts are generated correctly."""
+        grid = Grid(shape=(4, 4, 4))
+        u = TimeFunction(name='u', grid=grid,
+                         space_order=so, time_order=to, padding=padding)
+
+        op = Operator(Eq(u, 1), dse='noop', dle='noop')
+        params = runtime_arguments(op.parameters)
+        cast = CGen()._args_cast(params)[0]
+        assert cast.data.replace(' ', '') == expected
 
 
 @skipif_yask
