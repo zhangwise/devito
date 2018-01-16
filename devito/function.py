@@ -580,7 +580,6 @@ class TimeFunction(Function):
         if not self._cached():
             super(TimeFunction, self).__init__(*args, **kwargs)
             self.time_dim = kwargs.get('time_dim', None)
-            self.save = kwargs.get('save', None)
 
             time_order = kwargs.get('time_order', 1)
             if isinstance(time_order, int):
@@ -595,6 +594,7 @@ class TimeFunction(Function):
 
             self._padding = (kwargs.get('time_padding', (0, 0)),) + self._padding
 
+            self.save = kwargs.get('save', None)
             if self.save is not None:
                 if not isinstance(self.save, int):
                     raise ValueError("save must be an int indicating the number of " +
@@ -604,10 +604,8 @@ class TimeFunction(Function):
                 if np.dtype(self.dtype).itemsize * self.save > available_mem:
                     warning("Trying to allocate more memory for symbol %s " % self.name +
                             "than available on physical device, this will start swapping")
-                self.time_size = self.save
             else:
-                self.time_size = self.time_order + 1
-                self.indices[0].modulo = self.time_size
+                self.indices[0].modulo = self.time_order + 1
 
     @classmethod
     def _indices(cls, **kwargs):
@@ -637,10 +635,10 @@ class TimeFunction(Function):
 
     @property
     def shape_domain(self):
-        if self.save:
-            tsize = self.time_size - self.staggered[0]
+        if self.save is not None:
+            tsize = self.save - self.staggered[0]
         else:
-            tsize = self.time_order + 1
+            tsize = 1
         return (tsize,) +\
             tuple(i - j for i, j in zip(self._grid_shape_domain, self.staggered[1:]))
 
