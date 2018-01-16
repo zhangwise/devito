@@ -30,9 +30,6 @@ class Eq(sympy.Eq, EqMixin):
 
     A SymPy equation with associated iteration and data spaces.
 
-    All :class:`Function` objects within ``expr`` get indexified and thus turned
-    into objects of type :class:`types.Indexed`.
-
     The data space is an object of type :class:`DataSpace`. It represents the
     data points accessed by the equation along each :class:`Dimension`. The
     :class:`Dimension`s are extracted directly from the equation.
@@ -46,8 +43,8 @@ class Eq(sympy.Eq, EqMixin):
     def __new__(cls, *args, **kwargs):
         # Parse input
         if len(args) == 1:
-            input_expr = args[0]
-            assert isinstance(input_expr, sympy.Eq)
+            expr = input_expr = args[0]
+            assert isinstance(expr, sympy.Eq)
         elif len(args) == 2:
             # Reconstructing from existing Eq. E.g., we end up here after xreplace
             expr = super(Eq, cls).__new__(cls, *args, evaluate=False)
@@ -60,14 +57,6 @@ class Eq(sympy.Eq, EqMixin):
         else:
             raise ValueError("Cannot construct Eq from args=%s "
                              "and kwargs=%s" % (str(args), str(kwargs)))
-
-        # Indexification
-        expr = indexify(input_expr)
-
-        # Apply caller-provided substitution
-        subs = kwargs.get('subs')
-        if subs is not None:
-            expr = expr.xreplace(subs)
 
         expr = super(Eq, cls).__new__(cls, expr.lhs, expr.rhs, evaluate=False)
         expr.is_Increment = getattr(input_expr, 'is_Increment', False)
