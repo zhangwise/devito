@@ -32,9 +32,6 @@ class LoweredEq(Eq, EqMixin):
 
     A SymPy equation with associated iteration and data spaces.
 
-    All :class:`Function` objects within ``expr`` get indexified and thus turned
-    into objects of type :class:`types.Indexed`.
-
     The data space is an object of type :class:`DataSpace`. It represents the
     data points accessed by the equation along each :class:`Dimension`. The
     :class:`Dimension`s are extracted directly from the equation.
@@ -48,9 +45,9 @@ class LoweredEq(Eq, EqMixin):
     def __new__(cls, *args, **kwargs):
         # Parse input
         if len(args) == 1:
-            input_expr = args[0]
-            assert type(input_expr) != LoweredEq
-            assert isinstance(input_expr, Eq)
+            expr = input_expr = args[0]
+            assert type(expr) != LoweredEq
+            assert isinstance(expr, Eq)
         elif len(args) == 2:
             # Reconstructing from existing Eq. E.g., we end up here after xreplace
             expr = super(Eq, cls).__new__(cls, *args, evaluate=False)
@@ -63,14 +60,6 @@ class LoweredEq(Eq, EqMixin):
         else:
             raise ValueError("Cannot construct Eq from args=%s "
                              "and kwargs=%s" % (str(args), str(kwargs)))
-
-        # Indexification
-        expr = indexify(input_expr)
-
-        # Apply caller-provided substitution
-        subs = kwargs.get('subs')
-        if subs is not None:
-            expr = expr.xreplace(subs)
 
         # Well-defined dimension ordering
         ordering = dimension_sort(expr, key=lambda i: not i.is_Time)
