@@ -22,9 +22,8 @@ __all__ = ['Constant', 'Function', 'TimeFunction', 'SparseFunction',
            'Forward', 'Backward', 'CompositeFunction']
 
 
-class TimeAxis(object):
-    """Direction in which to advance the time index on
-    :class:`TimeFunction` objects.
+class Axis(object):
+    """Direction in which to perform an update.
 
     :param axis: Either 'Forward' or 'Backward'
     """
@@ -40,8 +39,8 @@ class TimeAxis(object):
         return {-1: 'Backward', 1: 'Forward'}[self._axis]
 
 
-Forward = TimeAxis('Forward')
-Backward = TimeAxis('Backward')
+Forward = Axis('Forward')
+Backward = Axis('Backward')
 
 
 class Constant(AbstractCachedSymbol):
