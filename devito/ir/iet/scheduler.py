@@ -8,6 +8,7 @@ from devito.ir.iet import (Expression, LocalExpression, Element, Iteration, List
                            UnboundedIndex, MetaCall, MapExpressions, Transformer,
                            NestedTransformer, SubstituteExpression, iet_analyze,
                            compose_nodes, filter_iterations, retrieve_iteration_tree)
+from devito.function import Forward
 from devito.tools import filter_ordered, flatten
 from devito.types import Scalar
 
@@ -52,6 +53,10 @@ def iet_make(clusters, dtype):
             root = None
             intervals = cluster.ispace.intervals
 
+            # Build Expressions
+            exprs = [Expression(v, np.int32 if cluster.trace.is_index(k) else dtype)
+                     for k, v in cluster.trace.items()]
+
             # Can I reuse any of the previously scheduled Iterations ?
             index = 0
             for i0, i1 in zip(intervals, list(schedule)):
@@ -64,6 +69,7 @@ def iet_make(clusters, dtype):
             # Build Iterations, including any necessary unbounded index
             iters = []
             for i in needed:
+                # unbounded indices
                 uindices = []
                 for j, offs in cluster.ispace.sub_iterators.get(i.dim, []):
                     for n, o in enumerate(filter_ordered(offs)):
@@ -71,12 +77,19 @@ def iet_make(clusters, dtype):
                         vname = Scalar(name=name, dtype=np.int32)
                         value = (i.dim + o) % j.modulo
                         uindices.append(UnboundedIndex(vname, value, value, j, j + o))
+                # Iteration direction
+                if i.dim.is_Time:
+                    output = [j.write for j in exprs if j.write.is_TimeFunction]
+                    assert len(output) >= 1
+                    if any(output[0].time_update != j.time_update for j in output):
+                        raise ValueError("Non-unique time update direction in %s"
+                                         % str(output))
+                    direction = output[0].time_update
+                else:
+                    direction = Forward
+                # Build an Iteration with full header but, for now, empty body
                 iters.append(Iteration([], i.dim, i.dim.limits, offsets=i.limits,
-                                       uindices=uindices))
-
-            # Build Expressions
-            exprs = [Expression(v, np.int32 if cluster.trace.is_index(k) else dtype)
-                     for k, v in cluster.trace.items()]
+                                       uindices=uindices, direction=direction))
 
             # Compose Iterations and Expressions
             body, tree = compose_nodes(iters + [exprs], retrieve=True)

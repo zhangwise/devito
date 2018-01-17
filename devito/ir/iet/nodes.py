@@ -13,6 +13,7 @@ from devito.ir.iet import (IterationProperty, SEQUENTIAL, PARALLEL,
                            VECTOR, ELEMENTAL, REMAINDER, WRAPPABLE,
                            tagger, ntags)
 from devito.ir.support import Stencil
+from devito.function import Forward
 from devito.symbolics import as_symbol, retrieve_terminals
 from devito.tools import as_tuple, filter_ordered, filter_sorted, flatten
 import devito.types as types
@@ -248,6 +249,9 @@ class Iteration(Node):
     :param uindices: a bag of UnboundedIndex objects, representing free iteration
                      variables (i.e., the Iteration end point is independent of
                      any of these UnboundedIndex).
+    :param direction: An object of type :class:`Axis` expressing the direction in
+                      which the iteration space is traversed. Defaults to ``Forward``
+                      (i.e., loop counter of type i++).
     """
 
     is_Iteration = True
@@ -255,7 +259,7 @@ class Iteration(Node):
     _traversable = ['nodes']
 
     def __init__(self, nodes, dimension, limits, index=None, offsets=None,
-                 properties=None, pragmas=None, uindices=None):
+                 properties=None, pragmas=None, uindices=None, direction=Forward):
         # Ensure we deal with a list of Expression objects internally
         nodes = as_tuple(nodes)
         self.nodes = as_tuple([n if isinstance(n, Node) else Expression(n)
@@ -264,9 +268,9 @@ class Iteration(Node):
 
         self.dim = dimension
         self.index = index or self.dim.name
-        # Store direction, as it might change on the dimension
-        # before we use it during code generation.
-        self.reverse = self.dim.reverse
+
+        # The iteration direction
+        self.direction = direction
 
         # Generate loop limits
         if isinstance(limits, Iterable):

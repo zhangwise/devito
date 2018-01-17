@@ -22,13 +22,11 @@ class Dimension(AbstractSymbol):
     potential iteration space.
 
     :param name: Name of the dimension symbol.
-    :param reverse: Optional, Traverse dimension in reverse order (default False)
     :param spacing: Optional, symbol for the spacing along this dimension.
     """
 
     def __new__(cls, name, **kwargs):
         newobj = sympy.Symbol.__new__(cls, name)
-        newobj._reverse = kwargs.get('reverse', False)
         newobj._spacing = kwargs.get('spacing', Scalar(name='h_%s' % name))
         return newobj
 
@@ -76,26 +74,15 @@ class Dimension(AbstractSymbol):
         return "%s_e" % self.name
 
     @property
-    def reverse(self):
-        return self._reverse
-
-    @property
     def spacing(self):
         return self._spacing
-
-    @reverse.setter
-    def reverse(self, val):
-        # TODO: this is an outrageous hack. TimeFunctions are updating this value
-        # at construction time. This is a symptom we need local and global dimensions
-        self._reverse = val
 
     @property
     def base(self):
         return self
 
     def _hashable_content(self):
-        return super(Dimension, self)._hashable_content() +\
-            (self.reverse, self.spacing)
+        return super(Dimension, self)._hashable_content() + (self.spacing,)
 
 
 class SpaceDimension(Dimension):
@@ -108,7 +95,6 @@ class SpaceDimension(Dimension):
     shortcut notations for spatial derivatives on :class:`Function`
     symbols.
     :param name: Name of the dimension symbol.
-    :param reverse: Traverse dimension in reverse order (default False)
     :param spacing: Optional, symbol for the spacing along this dimension.
     """
 
@@ -122,7 +108,6 @@ class TimeDimension(Dimension):
     of time. As time might be used in different contexts, all derived
     time dimensions should inherit from :class:`TimeDimension`.
     :param name: Name of the dimension symbol.
-    :param reverse: Traverse dimension in reverse order (default False)
     :param spacing: Optional, symbol for the spacing along this dimension.
     """
 
@@ -162,10 +147,6 @@ class SteppingDimension(Dimension):
         # TODO: this is an outrageous hack. TimeFunctions are updating this value
         # at construction time. This is a symptom we need local and global dimensions
         self._modulo = val
-
-    @property
-    def reverse(self):
-        return self.parent.reverse
 
     @property
     def spacing(self):

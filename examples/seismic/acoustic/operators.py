@@ -110,8 +110,8 @@ def AdjointOperator(model, source, receiver, time_order=2, space_order=4, **kwar
     """
     m, damp = model.m, model.damp
 
-    v = TimeFunction(name='v', grid=model.grid, save=None,
-                     time_order=2, space_order=space_order)
+    v = TimeFunction(name='v', grid=model.grid, space_order=space_order,
+                     time_order=2, time_update=Backward)
     srca = PointSource(name='srca', grid=model.grid, ntime=source.nt,
                        npoint=source.npoint)
     rec = Receiver(name='rec', grid=model.grid, ntime=receiver.nt,
@@ -132,7 +132,7 @@ def AdjointOperator(model, source, receiver, time_order=2, space_order=4, **kwar
 
     # Substitute spacing terms to reduce flops
     return Operator(eqn + receivers + source_a, subs=model.spacing_map,
-                    time_axis=Backward, name='Adjoint', **kwargs)
+                    name='Adjoint', **kwargs)
 
 
 def GradientOperator(model, source, receiver, time_order=2, space_order=4, save=True,
@@ -152,8 +152,8 @@ def GradientOperator(model, source, receiver, time_order=2, space_order=4, save=
     grad = Function(name='grad', grid=model.grid)
     u = TimeFunction(name='u', grid=model.grid, save=source.nt if save
                      else None, time_order=2, space_order=space_order)
-    v = TimeFunction(name='v', grid=model.grid, save=None,
-                     time_order=2, space_order=space_order)
+    v = TimeFunction(name='v', grid=model.grid, space_order=space_order,
+                     time_order=2, time_update=Backward)
     rec = Receiver(name='rec', grid=model.grid, ntime=receiver.nt,
                    npoint=receiver.npoint)
 
@@ -175,7 +175,7 @@ def GradientOperator(model, source, receiver, time_order=2, space_order=4, save=
 
     # Substitute spacing terms to reduce flops
     return Operator(eqn + receivers + [gradient_update], subs=model.spacing_map,
-                    time_axis=Backward, name='Gradient', **kwargs)
+                    name='Gradient', **kwargs)
 
 
 def BornOperator(model, source, receiver, time_order=2, space_order=4, **kwargs):

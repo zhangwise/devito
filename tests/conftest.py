@@ -5,7 +5,8 @@ import pytest
 from sympy import cos, Symbol  # noqa
 
 from devito import (Dimension, Eq, TimeDimension, SteppingDimension, SpaceDimension,  # noqa
-                    Constant, Function, TimeFunction, Grid, configuration)  # noqa
+                    Constant, Function, TimeFunction, Grid, configuration,  # noqa
+                    Forward, Backward)  # noqa
 from devito.types import Scalar, Array
 from devito.ir.iet import Iteration
 from devito.tools import as_tuple
@@ -39,8 +40,9 @@ def function(name, shape, dimensions):
     return Function(name=name, shape=shape, dimensions=dimensions)
 
 
-def timefunction(name):
-    return TimeFunction(name=name, grid=grid)
+def timefunction(name, backward_update=False):
+    return TimeFunction(name=name, grid=grid,
+                        time_update=Backward if backward_update else Forward)
 
 
 @pytest.fixture(scope="session")
@@ -154,6 +156,11 @@ def ti3(dims):
 @pytest.fixture(scope="session", autouse=True)
 def tu(dims):
     return timefunction('tu').indexify()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def tu_rev(dims):
+    return timefunction('tu', backward_update=True).indexify()
 
 
 @pytest.fixture(scope="session", autouse=True)

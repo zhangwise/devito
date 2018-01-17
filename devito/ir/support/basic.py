@@ -3,6 +3,7 @@ from cached_property import cached_property
 from sympy import Basic, Eq
 
 from devito.dimension import Dimension
+from devito.function import Forward
 from devito.symbolics import retrieve_terminals, q_affine, q_inc
 from devito.tools import as_tuple, is_integer, filter_sorted
 
@@ -354,7 +355,11 @@ class TimedAccess(Access):
         assert is_integer(timestamp)
         obj = super(TimedAccess, cls).__new__(cls, indexed, mode)
         obj.timestamp = timestamp
-        obj.direction = [DEC if i.reverse else INC for i in obj.findices]
+        if obj.function.is_TimeFunction:
+            obj.direction = [INC] if obj.function.time_update == Forward else [DEC]
+            obj.direction.extend([INC for _ in range(obj.function.ndim)])
+        else:
+            obj.direction = [INC for _ in range(obj.function.ndim)]
         return obj
 
     def __eq__(self, other):

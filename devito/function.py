@@ -519,6 +519,9 @@ class TimeFunction(Function):
                        data buffer. Like ``space_order``, this can be a single
                        integer or a 3-tuple.
     :param time_padding: (Optional) allocate extra points along the time dimension.
+    :param time_update: (Optional) the direction in which updates along the time
+                        dimension are performed. Defaults to ``Forward``. ``Backward``
+                        may alternatively be passed.
 
     .. note::
 
@@ -555,6 +558,7 @@ class TimeFunction(Function):
         if not self._cached():
             super(TimeFunction, self).__init__(*args, **kwargs)
             self.time_dim = kwargs.get('time_dim', None)
+            self.time_update = kwargs.get('time_update', Forward)
             self.save = kwargs.get('save', None)
 
             time_order = kwargs.get('time_order', 1)
