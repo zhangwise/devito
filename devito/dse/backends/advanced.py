@@ -112,11 +112,6 @@ class AdvancedRewriter(BasicRewriter):
         indices = g.space_indices
         time_invariants = {v.rhs: g.time_invariant(v) for v in g.values()}
 
-        # Template for captured redundancies
-        shape = tuple(i.symbolic_extent for i in indices)
-        make = lambda i: Array(name=template(i), shape=shape,
-                               dimensions=indices).indexed
-
         # Find the candidate expressions
         processed = []
         candidates = OrderedDict()
@@ -137,17 +132,21 @@ class AdvancedRewriter(BasicRewriter):
         for c, (origin, alias) in enumerate(aliases.items()):
             if all(i not in candidates for i in alias.aliased):
                 continue
-            function = make(c)
-            # Build new Cluster
-            expression = Eq(Indexed(function, *indices), origin)
+            # Retrieve the alias iteration space
             ispace = cluster.ispace.subtract(alias.anti_stencil.boxify().negate())
+            # Build a symbolic function for the alias
+            shape = tuple(ispace[i].extent for i in indices)
+            function = Array(name=template(c), shape=shape, dimensions=indices)
+            # Build alias Cluster
+            access = tuple(i - ispace[i].lower for i in indices)
+            expression = Eq(Indexed(function.indexed, *access), origin)
             if all(time_invariants[i] for i in alias.aliased):
                 ispace = ispace.drop([i.dim for i in ispace.intervals if i.dim.is_Time])
             alias_clusters.append(Cluster([expression], ispace))
-            # Update substitution rules
+            # Add substitution rules
             for aliased, distance in alias.with_distance:
-                coordinates = [sum([i, j]) for i, j in distance.items() if i in indices]
-                temporary = Indexed(function, *tuple(coordinates))
+                access = tuple(i - ispace[i].lower + j for i, j in distance.items())
+                temporary = Indexed(function.indexed, *tuple(access))
                 rules[candidates[aliased]] = temporary
                 rules[aliased] = temporary
         alias_clusters = groupby(alias_clusters).finalize()
