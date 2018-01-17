@@ -155,6 +155,10 @@ class AbstractSymbol(sympy.Symbol, Basic):
         return ()
 
     @property
+    def ndim(self):
+        return 0
+
+    @property
     def symbolic_shape(self):
         return ()
 
@@ -282,7 +286,7 @@ class AbstractCachedFunction(AbstractFunction, Cached):
         return []
 
     @property
-    def dim(self):
+    def ndim(self):
         """Return the rank of the object."""
         return len(self.shape)
 
