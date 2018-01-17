@@ -448,10 +448,12 @@ class TestArguments(object):
         self.verify_arguments(arguments, expected)
         # Verify execution
         op(**args)
-        mask = np.ones((3, 5, 6, 7), dtype=np.bool)
-        mask[:, 1:3, 2:4, 3:5] = False
-        assert (f.data[mask] == 0.).all()
-        assert (f.data[:, 1:3, 2:4, 3:5] == 1.).all()
+        # Shape is (5, 6, 7) + halo(2 (time_order))
+        mask = np.ones((3, 7, 8, 9), dtype=np.bool)
+        # Operator was run from (1:3, 2:4, 3:5), shifted by 1 because of halo
+        mask[:, 2:4, 3:5, 4:6] = False
+        assert (f.data_allocated[mask] == 0.).all()
+        assert (f.data_allocated[:, 2:4, 3:5, 4:6] == 1.).all()
 
     def test_override_function_data(self):
         """
@@ -569,14 +571,14 @@ class TestArguments(object):
         op = Operator(Eq(a.forward, a + one))
 
         # Test dimension override via the buffered dimenions
-        a.data[0] = 0.
+        a.data_allocated[:] = 0.
         op(a=a, t=6)
-        assert(np.allclose(a.data[1], 5.))
+        assert(np.allclose(a.data, 5.))
 
         # Test dimension override via the parent dimenions
-        a.data[0] = 0.
-        op(a=a, time=5)
-        assert(np.allclose(a.data[0], 4.))
+        a.data_allocated[:] = 0.
+        op(a=a, t=6)
+        assert(np.allclose(a.data, 4.))
 
     def test_override_composite_data(self):
         i, j = dimify('i j')
