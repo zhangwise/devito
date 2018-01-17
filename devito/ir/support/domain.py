@@ -177,8 +177,12 @@ class Space(object):
         return Space(intervals)
 
     @property
+    def size(self):
+        return len(self.intervals)
+
+    @property
     def empty(self):
-        return len(self.intervals) == 0
+        return self.size == 0
 
     @property
     def is_well_defined(self):
