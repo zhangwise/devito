@@ -150,14 +150,13 @@ class PtrArgument(Argument):
 class ArgumentEngine(object):
     """ Class that encapsulates the argument derivation and verification subsystem
     """
-    def __init__(self, ispace, parameters, dle_arguments):
+    def __init__(self, parameters, dle_arguments):
         self.parameters = parameters
         self.dle_arguments = dle_arguments
         argument_list = self._build_arguments_list(parameters)
         self.arguments = filter_ordered([x for x in argument_list if x.is_Argument],
                                         key=lambda x: x.name)
         self.dimension_params = [x for x in argument_list if x.is_DimensionParameter]
-        self.offsets = retrieve_offsets(ispace)
 
     def handle(self, **kwargs):
         """ The main method by which the :class:`Operator` interacts with this class.
@@ -165,8 +164,6 @@ class ArgumentEngine(object):
         """
 
         user_autotune = kwargs.pop('autotune', False)
-
-        kwargs = self._offset_adjust(kwargs)
 
         kwargs = self._extract_children_of_composites(kwargs)
 
@@ -185,12 +182,6 @@ class ArgumentEngine(object):
         arguments = OrderedDict([(k.name, v) for k, v in values.items()])
 
         return arguments, user_autotune and dle_autotune
-
-    def _offset_adjust(self, kwargs):
-        for k, v in kwargs.items():
-            if k in self.offsets:
-                kwargs[k] = v + self.offsets[k]
-        return kwargs
 
     def _build_arguments_list(self, parameters):
         # Pass through SymbolicFunction
@@ -509,16 +500,6 @@ def runtime_dim_extent(dimension, values):
             find_argument_by_name(dimension.start_name, values)
     except (KeyError, TypeError):
         return None
-
-
-def retrieve_offsets(ispace):
-    """
-    Return a mapper from :class:`Dimension`s to the min/max integer offsets
-    within ``ispace``.
-    """
-    mapper = {i.dim: i.min_extent for i in ispace.intervals}
-    mapper.update({d.parent: v for d, v in mapper.items() if d.is_Stepping})
-    return {d.end_name: v for d, v in mapper.items()}
 
 
 def derive_dle_arg_value(blocked_dim, known_values, dle_argument):

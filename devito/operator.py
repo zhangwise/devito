@@ -120,9 +120,7 @@ class Operator(Callable):
         nodes = iet_insert_C_decls(dle_state.nodes, self.func_table)
 
         # Initialise ArgumentEngine
-        self.argument_engine = ArgumentEngine(clusters.ispace, parameters,
-                                              self.dle_arguments)
-
+        self.argument_engine = ArgumentEngine(parameters, self.dle_arguments)
         parameters = self.argument_engine.arguments
 
         # Finish instantiation
