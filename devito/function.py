@@ -1,6 +1,6 @@
 from collections import OrderedDict, namedtuple
 from functools import partial
-from math import ceil
+from math import ceil, floor
 
 import sympy
 import numpy as np
@@ -123,7 +123,15 @@ class Function(TensorFunction):
                         approximation order, while ``lp`` and ``rp`` indicate
                         the maximum number of points that an approximation can
                         use on the two sides of the point of interest.
-    :param initializer: Function to initialize the data, optional
+    :param boundary: (Optional) number of grid points for initial conditions
+                     on both sides of each space dimension. Defaults to
+                     ``floor(space_order/2) - 1``. Alternatively, one may
+                     provide either a different integer value or even an
+                     iterable of 2-tuples ``(lb, rb)``, with as many entries
+                     as the number of function dimensions. In such a case,
+                     ``lb`` is the number of boundary points on the left side
+                     of the dimension, while ``rb`` refers to the right side.
+    :param initializer: (Optional) function to initialize the data.
 
     .. note::
 
@@ -177,6 +185,7 @@ class Function(TensorFunction):
             self._first_touch = kwargs.get('first_touch', configuration['first_touch'])
             self._data = None
 
+            # Halo
             space_order = kwargs.get('space_order', 1)
             if isinstance(space_order, int):
                 self.space_order = space_order
@@ -188,6 +197,17 @@ class Function(TensorFunction):
             else:
                 raise ValueError("'space_order' must be int or 3-tuple of ints")
 
+            # Boundary
+            boundary = kwargs.get('boundary', floor(space_order/2) - 1)
+            if isinstance(boundary, int):
+                self._boundary = tuple((boundary,)*2 for i in range(self.ndim))
+            elif isinstance(boundary, tuple) and len(boundary) == self.ndim:
+                self._boundary = boundary
+            else:
+                raise ValueError("'boundary' must be int or "
+                                 "%d-tuple of 2-tuples" % self.ndim)
+
+            # Padding
             padding = kwargs.get('padding', 0)
             if isinstance(padding, int):
                 self._padding = tuple((padding,)*2 for i in range(self.ndim))
@@ -533,6 +553,15 @@ class TimeFunction(Function):
                         approximation order, while ``lp`` and ``rp`` indicate
                         the maximum number of points that an approximation can
                         use on the two sides of the point of interest.
+    :param boundary: (Optional) number of grid points for initial conditions
+                     on both sides of each space dimension. Defaults to
+                     ``floor(space_order/2) - 1``. Alternatively, one may
+                     provide either a different integer value or even an
+                     iterable of 2-tuples ``(lb, rb)``, with as many entries
+                     as the number of function dimensions. In such a case,
+                     ``lb`` is the number of boundary points on the left side
+                     of the dimension, while ``rb`` refers to the right side.
+    :param initializer: (Optional) function to initialize the data.
     :param save: Save the intermediate results to the data buffer. Defaults
                  to ``None``, indicating the use of alternating buffers. If
                  intermediate results are required, the value of save must
@@ -543,6 +572,11 @@ class TimeFunction(Function):
                        final size of the leading time dimension of the
                        data buffer. Like ``space_order``, this can be a single
                        integer or a 3-tuple.
+    :param time_boundary: (Optional) number of points in the time dimension
+                          for initial conditions. Defaults to ``time_order``
+                          on the left side, and 0 the right side. Alternatively,
+                          an integer or a 2-tuple with same semantics as that
+                          of ``boundary`` may be provided.
     :param time_padding: (Optional) allocate extra points along the time dimension.
 
     .. note::
@@ -581,10 +615,11 @@ class TimeFunction(Function):
             super(TimeFunction, self).__init__(*args, **kwargs)
             self.time_dim = kwargs.get('time_dim', None)
 
+            # Halo
             time_order = kwargs.get('time_order', 1)
             if isinstance(time_order, int):
                 self.time_order = time_order
-                self._halo = ((time_order, 0),) + self._halo
+                self._halo = ((0, 0),) + self._halo
             elif isinstance(time_order, tuple) and len(time_order) == 3:
                 time_order, left_points, right_points = time_order
                 self.time_order = time_order
@@ -592,7 +627,13 @@ class TimeFunction(Function):
             else:
                 raise ValueError("'space_order' must be int or 3-tuple of ints")
 
-            self._padding = (kwargs.get('time_padding', (0, 0)),) + self._padding
+            # Boundary
+            time_boundary = kwargs.get('time_boundary', (time_order, 0))
+            self._boundary = (time_boundary,) + self._boundary
+
+            # Padding
+            time_padding = kwargs.get('time_padding', (0, 0))
+            self._padding = (time_padding,) + self._padding
 
             self.save = kwargs.get('save', None)
             if self.save is not None:
@@ -636,10 +677,10 @@ class TimeFunction(Function):
     @property
     def shape_domain(self):
         if self.save is not None:
-            tsize = self.save - self.staggered[0]
+            time_size = sum(self._boundary[0]) + self.save - self.staggered[0]
         else:
-            tsize = 1
-        return (tsize,) +\
+            time_size = sum(self._boundary[0]) + 1
+        return (time_size,) +\
             tuple(i - j for i, j in zip(self._grid_shape_domain, self.staggered[1:]))
 
     @property
