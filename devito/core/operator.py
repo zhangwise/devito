@@ -56,34 +56,37 @@ class OperatorCore(OperatorRunnable):
         if subs is not None:
             expressions = [i.xreplace(subs) for i in expressions]
 
-        indexeds = set.union(*[retrieve_indexed(e) for e in expressions])
-        indexeds = [i for i in indexeds if i.base.function.is_SymbolicFunction]
-
-        # Retrieve shifting along each dimension
+        # Calculate shifting along each dimension
         constraints = {}
-        for indexed in indexeds:
+        for e in expressions:
+            indexed = e.lhs
             f = indexed.base.function
+            if not f.is_SymbolicFunction:
+                # Not user-provided tensor data, nothing to do
+                continue
             for i, d, gap in zip(indexed.indices, f.dimensions, f._offset_domain):
                 if not q_affine(i, d):
                     # Sparse iteration, no check possible
                     continue
-                ofs = i - d
-                if not ofs.is_Number:
+                shift = i - d
+                if not shift.is_Number:
                     raise InvalidOperator("Array access `%s` in %s is not a "
                                           "translated identity function" % (i, indexed))
-                shift = abs(min(gap.left + ofs, 0)) + abs(min(gap.right - ofs, 0))
                 if shift != 0 and shift != constraints.setdefault(d, shift):
                     raise InvalidOperator("Array access `%s` in %s with halo %s "
                                           "has incompatible shift %d (expected %d)"
                                           % (i, indexed, gap, shift, constraints[d]))
 
-        # Apply shifting
+        # Translate array accesses (halo + shift)
         mapper = {}
-        for indexed in indexeds:
-            f = indexed.base.function
-            subs = {i: i + gap.left - constraints.get(d, 0)
-                    for i, d, gap in zip(indexed.indices, f.dimensions, f._offset_domain)}
-            mapper[indexed] = indexed.xreplace(subs)
+        for e in expressions:
+            for indexed in retrieve_indexed(e):
+                f = indexed.base.function
+                if not f.is_SymbolicFunction:
+                    continue
+                subs = {i: i + gap.left - constraints.get(d, 0) for i, d, gap in
+                        zip(indexed.indices, f.dimensions, f._offset_domain)}
+                mapper[indexed] = indexed.xreplace(subs)
 
         # Finally translate the expressions
         expressions = [e.xreplace(mapper) for e in expressions]
