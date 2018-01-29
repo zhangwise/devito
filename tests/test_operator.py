@@ -60,11 +60,11 @@ class TestCodeGen(object):
         assert 'a_dense[x + 1] = 2.0F*constant + a_dense[x + 1]' in str(op)
 
     @pytest.mark.parametrize('expr, so, to, expected', [
-        ('Eq(u.forward,u+1)', 0, 1, 'Eq(u[t+1,x,y,z],u[t,x,y,z]+1)'),
-        ('Eq(u.forward,u+1)', 1, 1, 'Eq(u[t+1,x+1,y+1,z+1],u[t,x+1,y+1,z+1]+1)'),
-        ('Eq(u.forward,u+1)', 1, 2, 'Eq(u[t+2,x+1,y+1,z+1],u[t+1,x+1,y+1,z+1]+1)'),
+        ('Eq(u.forward,u+1)', 0, 1, 'Eq(u[t,x,y,z],u[t-1,x,y,z]+1)'),
+        ('Eq(u.forward,u+1)', 1, 1, 'Eq(u[t,x+1,y+1,z+1],u[t-1,x+1,y+1,z+1]+1)'),
+        ('Eq(u.forward,u+1)', 1, 2, 'Eq(u[t,x+1,y+1,z+1],u[t-1,x+1,y+1,z+1]+1)'),
         ('Eq(u.forward,u+u.backward + m)', 8, 2,
-         'Eq(u[t+2,x+4,y+4,z+4],m[x,y,z]+u[t,x+4,y+4,z+4]+u[t+1,x+4,y+4,z+4])')
+         'Eq(u[t,x+4,y+4,z+4],m[x,y,z]+u[t-2,x+4,y+4,z+4]+u[t-1,x+4,y+4,z+4])')
     ])
     def test_index_shifting(self, expr, so, to, expected):
         """Tests that array accesses get properly shifted based on the halo and
@@ -78,7 +78,7 @@ class TestCodeGen(object):
         expr = eval(expr)
 
         op = Operator(expr, dse='noop', dle='noop')
-        lowered = op._specialize_exprs([expr], None)[0]
+        lowered = op._specialize_exprs([expr], {})[0]
         assert str(lowered).replace(' ', '') == expected
 
     @pytest.mark.parametrize('so, to, padding, expected', [
@@ -875,7 +875,7 @@ class TestLoopScheduler(object):
         # Time Forward, anti dependence in time, end up in different loop nests
         (('Eq(tu[t-1,x,y,z], tu[t,x,y,z] + tv[t,x,y,z])',
           'Eq(tv[t,x,y,z], tu[t,x,y,z+2])',
-          'Eq(tu[t-2,x,y,0], tu[t,x,y,0] + 1.)'),
+          'Eq(tu[t-1,x,y,0], tu[t,x,y,0] + 1.)'),
          Forward, ['txyz', 'txyz', 'txy'], 'txyztxyztxy'),
         # Time Backward, so flow dependences in time
         (('Eq(tu[t-1,x,y,z], tu[t,x+3,y,z] + tv[t,x,y,z])',
