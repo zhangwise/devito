@@ -21,5 +21,5 @@ def test_subsampled_dimension():
     fwd_op = Operator([fwd_eqn, fwd_eqn_2])
     fwd_op = Operator([fwd_eqn, fwd_eqn_2, save_eqn])
     #pprint(fwd_op)
-    #print(fwd_op)
+    print(fwd_op)
 

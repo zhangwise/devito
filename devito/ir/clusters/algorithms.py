@@ -20,11 +20,9 @@ def groupby(clusters):
         based upon classic Lamport theory.
     """
     clusters = clusters.unfreeze()
-    print([c.stencil for c in clusters])
 
     processed = ClusterGroup()
-    print(processed)
-    print("2222")
+    
     for c in clusters:
         fused = False
         for candidate in reversed(list(processed)):

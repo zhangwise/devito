@@ -79,8 +79,6 @@ class Operator(Callable):
         self.dtype = retrieve_dtype(expressions)
         self.input, self.output, self.dimensions = retrieve_symbols(expressions)
 
-        self.offsets = {d.end_name: v for d, v in retrieve_offsets(stencils).items()}
-
         # Set the direction of time acoording to the given TimeAxis
         for time in [d for d in self.dimensions if d.is_Time]:
             if not time.is_Derived:
@@ -102,8 +100,6 @@ class Operator(Callable):
 
         # Translate into backend-specific representation (e.g., GPU, Yask)
         nodes = self._specialize(nodes, parameters)
-
-        printAST(nodes)
 
         # Apply the Devito Loop Engine (DLE) for loop optimization
         dle_state = transform(nodes, *set_dle_mode(dle))
