@@ -92,7 +92,7 @@ class Dimension(AbstractSymbol):
 
     @reverse.setter
     def reverse(self, val):
-        # TODO: this is an outrageous hack. TimeFunctions are updating this value
+        # TODO: this is an outrageous hack. Operators are updating this value
         # at construction time.
         self._reverse = val
 
@@ -104,13 +104,15 @@ class Dimension(AbstractSymbol):
         return super(Dimension, self)._hashable_content() +\
             (self.reverse, self.spacing)
 
-    def argument_defaults(self, size=None):
+    def argument_defaults(self, start=None, size=None):
         """
         Returns a map of default argument values defined by this symbol.
 
-        :param size: Optional, known size as provided by data-carrying symbols
+        :param start: Optional, known starting point as provided by
+                      data-carrying symbols.
+        :param size: Optional, known size as provided by data-carrying symbols.
         """
-        return {self.start_name: 0, self.end_name: size, self.size_name: size}
+        return {self.start_name: start or 0, self.end_name: size, self.size_name: size}
 
     def argument_values(self, **kwargs):
         """
@@ -289,18 +291,20 @@ class SteppingDimension(DerivedDimension):
         """
         return self.parent.symbolic_end
 
-    def argument_defaults(self, size=None):
+    def argument_defaults(self, start=None, size=None):
         """
         Returns a map of default argument values defined by this symbol.
 
-        :param size: Optional, known size as provided by data-carrying symbols
+        :param start: Optional, known starting point as provided by
+                      data-carrying symbols.
+        :param size: Optional, known size as provided by data-carrying symbols.
 
         note ::
 
         A :class:`SteppingDimension` neither knows its size nor its
         iteration end point. So all we can provide is a starting point.
         """
-        return {self.parent.start_name: 0}
+        return {self.parent.start_name: start}
 
     def argument_values(self, **kwargs):
         """
