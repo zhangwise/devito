@@ -89,6 +89,7 @@ class AcousticWaveSolver(object):
         if rec is None:
             rec = Receiver(name='rec', grid=self.model.grid,
                            ntime=self.receiver.nt,
+                           npoint=self.receiver.npoint,
                            coordinates=self.receiver.coordinates.data)
 
         # Create the forward wavefield if not provided

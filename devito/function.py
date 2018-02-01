@@ -796,8 +796,7 @@ class SparseFunction(TensorFunction):
     def __init__(self, *args, **kwargs):
         if not self._cached():
             super(SparseFunction, self).__init__(*args, **kwargs)
-
-            npoint = kwargs.get('npoint')
+            npoint = kwargs.get('npoint') or kwargs.get('coordinates').data.shape[0]
             if not isinstance(npoint, int) and npoint > 0:
                 raise ValueError('SparseFunction requires parameter `npoint` (> 0)')
             self.npoint = npoint
@@ -838,7 +837,7 @@ class SparseFunction(TensorFunction):
         if dimensions is not None:
             return dimensions
         else:
-            return (Dimension(name='p'),)
+            return (Dimension(name='p_%s' % kwargs.get('name')),)
 
     @property
     def shape_domain(self):
@@ -1112,4 +1111,26 @@ class SparseTimeFunction(SparseFunction):
         if dimensions is not None:
             return dimensions
         else:
-            return (kwargs['grid'].time_dim, Dimension(name='p'))
+            return (kwargs['grid'].time_dim, Dimension(name='p_%s' % kwargs.get('name')))
+            
+    @property
+    def dt(self):
+        """Symbol for the first derivative wrt the time dimension"""
+        _t = self.indices[0]
+        if self.time_order == 1:
+            # This hack is needed for the first-order diffusion test
+            indices = [_t, _t + _t.spacing]
+        else:
+            width = int(self.time_order / 2)
+            indices = [(_t + i * _t.spacing) for i in range(-width, width + 1)]
+
+        return self.diff(_t).as_finite_difference(indices)
+
+    @property
+    def dt2(self):
+        """Symbol for the second derivative wrt the t dimension"""
+        _t = self.indices[0]
+        width_t = int(self.time_order / 2)
+        indt = [(_t + i * _t.spacing) for i in range(-width_t, width_t + 1)]
+
+        return self.diff(_t, _t).as_finite_difference(indt)

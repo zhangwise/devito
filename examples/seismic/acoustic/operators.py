@@ -70,7 +70,7 @@ def ForwardOperator(model, source, receiver, space_order=4,
                      save=source.nt if save else None,
                      time_order=2, space_order=space_order)
     src = PointSource(name='src', grid=model.grid, ntime=source.nt,
-                      npoint=source.npoint)
+                      npoint=source.npoint, time_order=source.time_order)
     rec = Receiver(name='rec', grid=model.grid, ntime=receiver.nt,
                    npoint=receiver.npoint)
 

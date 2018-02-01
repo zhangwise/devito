@@ -38,14 +38,15 @@ def acoustic_setup(shape=(50, 50, 50), spacing=(15.0, 15.0, 15.0),
     time = np.linspace(t0, tn, nt)  # Discretized time axis
 
     # Define source geometry (center of domain, just below surface)
-    src = RickerSource(name='src', grid=model.grid, f0=0.01, time=time)
+    src = RickerSource(name='src', grid=model.grid, f0=0.01, time=time, time_order=2)
     src.coordinates.data[0, :] = np.array(model.domain_size) * .5
     src.coordinates.data[0, -1] = model.origin[-1] + 2 * spacing[-1]
 
     # Define receiver geometry (spread across x, just below surface)
-    rec = Receiver(name='nrec', grid=model.grid, ntime=nt, npoint=nrec)
+    rec = Receiver(name='rec', grid=model.grid, ntime=nt, npoint=nrec)
     rec.coordinates.data[:, 0] = np.linspace(0., model.domain_size[0], num=nrec)
     rec.coordinates.data[:, 1:] = src.coordinates.data[0, 1:]
+
 
     # Create solver object to provide relevant operators
     solver = AcousticWaveSolver(model, source=src, receiver=rec, kernel=kernel,
@@ -65,6 +66,10 @@ def run(shape=(50, 50, 50), spacing=(20.0, 20.0, 20.0), tn=1000.0,
     dm = np.float32(initial_vp**2 - solver.model.m.data)
     info("Applying Forward")
     rec, u, summary = solver.forward(save=full_run, autotune=autotune)
+    
+    import matplotlib.pyplot as plt
+    plt.imshow(rec.data)
+    plt.show()
 
     if constant:
         # With  a new m as Constant

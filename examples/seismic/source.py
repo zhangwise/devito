@@ -26,32 +26,24 @@ class PointSource(SparseTimeFunction):
     Note, either the dimensions `ntime` and `npoint` or the fully
     initialised `data` array need to be provided.
     """
-
-    def __new__(cls, name, grid, ntime=None, npoint=None, data=None,
-                coordinates=None, **kwargs):
-        p_dim = kwargs.get('dimension', Dimension(name='p_%s' % name))
-        npoint = npoint or coordinates.shape[0]
-        if data is None:
-            if ntime is None:
-                error('Either data or ntime are required to'
-                      'initialise source/receiver objects')
-        else:
-            ntime = ntime or data.shape[0]
-
-        # Create the underlying SparseTimeFunction object
-        obj = SparseTimeFunction.__new__(cls, name=name, grid=grid,
-                                         dimensions=[grid.time_dim, p_dim],
-                                         npoint=npoint, nt=ntime,
-                                         coordinates=coordinates, **kwargs)
-
-        # If provided, copy initial data into the allocated buffer
-        if data is not None:
-            obj.data[:] = data
-        return obj
-
     def __init__(self, *args, **kwargs):
         if not self._cached():
+            p_dim = kwargs.get('dimension', Dimension(name='p_%s' % kwargs.get('name')))
+            npoint = kwargs.get('npoint')
+            ntime = kwargs.get('ntime', None)
+            if kwargs.get('data', None) is None:
+                if ntime is None:
+                    error('Either data or ntime are required to'
+                          'initialise source/receiver objects')
+            else:
+                ntime = ntime or data.shape[0]
+            kwargs['nt'] = ntime
+            kwargs['dimensions'] = (kwargs.get('grid').time_dim, p_dim)
+            kwargs['shape'] = (ntime, npoint)
             super(PointSource, self).__init__(*args, **kwargs)
+            
+            if kwargs.get('data', None) is not None:
+                self.data[:] = data
 
 
 Receiver = PointSource
@@ -69,22 +61,16 @@ class WaveletSource(PointSource):
     :param time: Discretized values of time in ms
     """
 
-    def __new__(cls, *args, **kwargs):
-        time = kwargs.get('time')
-        npoint = kwargs.get('npoint', 1)
-        kwargs['ntime'] = len(time)
-        kwargs['npoint'] = npoint
-        obj = PointSource.__new__(cls, *args, **kwargs)
-
-        obj.time = time
-        obj.f0 = kwargs.get('f0')
-        for p in range(npoint):
-            obj.data[:, p] = obj.wavelet(obj.f0, obj.time)
-        return obj
-
     def __init__(self, *args, **kwargs):
         if not self._cached():
+            self.time = kwargs.get('time')
+            self.npoint = kwargs.get('npoint', 1)
+            self.f0=f0 = kwargs.get('f0')
+            kwargs['ntime'] = len(self.time)
+            kwargs['npoint'] = self.npoint
             super(WaveletSource, self).__init__(*args, **kwargs)
+            for p in range(kwargs['npoint']):
+                self.data[:, p] = self.wavelet(self.f0, self.time)
 
     def wavelet(self, f0, t):
         """
