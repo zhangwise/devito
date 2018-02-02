@@ -381,7 +381,7 @@ class TestArguments(object):
             # Default dimensions of the sparse data
             'p_size': 3, 'p_s': 0, 'p_e': 3,
             'd_size': 3, 'p_s': 0, 'p_e': 3,
-            'time_size': 4, 'time_s': 0, 'time_e': 4,
+            'time_size': 4, 'time_s': 1, 'time_e': 4,
         }
         self.verify_arguments(op.arguments(), expected)
 
@@ -507,7 +507,7 @@ class TestArguments(object):
         Test runtime data overrides for :class:`TimeFunction` symbols.
         """
         grid = Grid(shape=(5, 6, 7))
-        a = TimeFunction(name='a', grid=grid)
+        a = TimeFunction(name='a', grid=grid, time_order=0)
         # Suppress DLE to work around a know bug with GCC and OpenMP:
         # https://github.com/opesci/devito/issues/320
         op = Operator(Eq(a, a + 3), dle=None)
@@ -515,19 +515,19 @@ class TestArguments(object):
         # Run with default value
         a.data[:] = 1.
         op(t=1)
-        assert (a.data[0] == 4.).all()
+        assert (a.data == 4.).all()
 
         # Override with symbol (different name)
-        a1 = TimeFunction(name='a1', grid=grid)
+        a1 = TimeFunction(name='a1', grid=grid, time_order=0)
         a1.data[:] = 2.
         op(t=1, a=a1)
-        assert (a1.data[0] == 5.).all()
+        assert (a1.data == 5.).all()
 
         # Override with symbol (same name as original)
-        a2 = TimeFunction(name='a', grid=grid)
+        a2 = TimeFunction(name='a', grid=grid, time_order=0)
         a2.data[:] = 3.
         op(t=1, a=a2)
-        assert (a2.data[0] == 6.).all()
+        assert (a2.data == 6.).all()
 
         # Override with user-allocated numpy data
         a3 = np.zeros_like(a.data_allocated)
@@ -544,7 +544,7 @@ class TestArguments(object):
 
         time = b.indices[0]
         op_arguments = op.arguments()
-        assert(op_arguments[time.start_name] == 0)
+        assert(op_arguments[time.start_name] == 1)
         assert(op_arguments[time.end_name] == nt)
 
     def test_dimension_offset_adjust(self, nt=100):
@@ -559,7 +559,7 @@ class TestArguments(object):
                  + b.indexed[time, i, j, k] + a[i, j, k])
         op = Operator(eqn)
         op_arguments = op.arguments(time=nt-10)
-        assert(op_arguments[time.start_name] == 0)
+        assert(op_arguments[time.start_name] == 1)
         assert(op_arguments[time.end_name] == nt - 10)
 
     def test_dimension_size_override(self):
@@ -587,10 +587,10 @@ class TestArguments(object):
         p_dim = Dimension(name='p_src')
         u = TimeFunction(name='u', grid=grid, time_order=2, space_order=2)
         time = u.indices[0]
-        src1 = SparseTimeFunction(name='src1', grid=grid, dimensions=[time, p_dim],
-                                  npoint=1, nt=10, coordinates=original_coords)
-        src2 = SparseTimeFunction(name='src1', grid=grid, dimensions=[time, p_dim],
-                                  npoint=1, nt=10, coordinates=new_coords)
+        src1 = SparseTimeFunction(name='src1', grid=grid, dimensions=[time, p_dim], nt=10,
+                                  npoint=1, coordinates=original_coords, time_order=2)
+        src2 = SparseTimeFunction(name='src1', grid=grid, dimensions=[time, p_dim], nt=10,
+                                  npoint=1, coordinates=new_coords, time_order=2)
         op = Operator(src1.inject(u, src1))
 
         # Move the source from the location where the setup put it so we can test
@@ -616,23 +616,23 @@ class TestArguments(object):
         # Simple case, same as that tested above.
         # Repeated here for clarity of further tests.
         op_arguments = op.arguments()
-        assert(op_arguments[time.start_name] == 0)
+        assert(op_arguments[time.start_name] == 1)
         assert(op_arguments[time.end_name] == nt)
 
         # Providing a tensor argument should infer the dimension size from its shape
         op_arguments = op.arguments(b=b1)
-        assert(op_arguments[time.start_name] == 0)
+        assert(op_arguments[time.start_name] == 1)
         assert(op_arguments[time.end_name] == nt + 1)
 
         # Providing a dimension size explicitly should override the automatically inferred
         op_arguments = op.arguments(b=b1, time=nt - 1)
-        assert(op_arguments[time.start_name] == 0)
+        assert(op_arguments[time.start_name] == 1)
         assert(op_arguments[time.end_name] == nt - 1)
 
         # Providing a scalar argument explicitly should override the automatically\
         # inferred
         op_arguments = op.arguments(b=b1, time_e=nt - 2)
-        assert(op_arguments[time.start_name] == 0)
+        assert(op_arguments[time.start_name] == 1)
         assert(op_arguments[time.end_name] == nt - 2)
 
     def test_derive_constant_value(self):
