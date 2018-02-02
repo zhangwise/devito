@@ -59,6 +59,10 @@ class Eq(sympy.Eq, FrozenExpr):
         obj._region = region
         return obj
 
+    def xreplace(self, rules):
+        return Eq(self.lhs.xreplace(rules), self.rhs.xreplace(rules),
+                  region=self._region)
+
 
 class Inc(Eq):
     """
